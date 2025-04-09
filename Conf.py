@@ -1,7 +1,22 @@
 import subprocess
 import re
+import datetime
 
-# 这个函数用于打印系统中所有的网卡和IP地址
+# 定义一个函数用于将日志保存到文件
+def save_log_to_file(log, interface_name, ip_pattern):
+    try:
+        # 获取当前时间戳
+        timestamp = datetime.datetime.now().strftime('%Y%m%d')
+        # 构建文件名
+        filename = f"医保ip信息_log_{timestamp}_勿删.txt"
+        # 打开文件并写入日志
+        with open(filename, 'w', encoding='utf-8') as file:
+            file.write(log)
+        print(f"日志已成功保存到 {filename}")
+    except Exception as e:
+        print(f"保存日志时出错: {e}")
+
+# 这个函数用于打印系统中所有的网卡和IP地址，并返回输出以供后续使用
 def print_interfaces_and_ips():
     try:
         # 使用ipconfig命令在Windows上获取所有网卡的IP地址信息
@@ -11,7 +26,7 @@ def print_interfaces_and_ips():
         return output
     except Exception as e:
         print(f"获取网卡和IP地址时出错: {e}")
-    return None
+        return str(e)
 
 # 这个函数用于查找与指定IP地址模式相关的网卡名称，并返回匹配的IP地址
 def find_interface_by_ip_pattern(output, ip_pattern):
@@ -35,7 +50,7 @@ def find_interface_by_ip_pattern(output, ip_pattern):
         return None, None
     except Exception as e:
         print(f"查找网卡时出错: {e}")
-    return None, None
+        return None, str(e)
 
 # 这个函数用于修改指定网卡的MTU
 def change_mtu(interface_name, mtu):
@@ -45,8 +60,10 @@ def change_mtu(interface_name, mtu):
         print(f"执行的命令: {' '.join(command)}")
         subprocess.run(command, check=True)
         print(f"网卡 {interface_name} 的MTU已成功修改为 {mtu}")
+        return f"执行的命令: {' '.join(command)}\n网卡 {interface_name} 的MTU已成功修改为 {mtu}\n"
     except Exception as e:
         print(f"修改MTU时出错: {e}")
+        return f"修改MTU时出错: {e}\n"
 
 # 这个函数用于添加路由
 def add_route(ip_address):
@@ -60,19 +77,36 @@ def add_route(ip_address):
         print(f"执行的命令: {' '.join(command)}")
         subprocess.run(command, check=True)
         print(f"已成功添加路由至 10.0.0.0，网关为 {gateway}")
+        return f"执行的命令: {' '.join(command)}\n已成功添加路由至 10.0.0.0，网关为 {gateway}\n"
     except Exception as e:
         print(f"添加路由时出错: {e}")
+        return f"添加路由时出错: {e}\n"
 
-# 打印系统中的所有网卡和IP地址
-output = print_interfaces_and_ips()
+# 主程序
+def main():
+    # 打印系统中的所有网卡和IP地址
+    output = print_interfaces_and_ips()
 
-# 指定要查找的IP地址模式
-ip_pattern = r'10\.36\.[0-9]+\.[0-9]+'
-# 查找对应的网卡名称和IP地址
-interface_name, ip_address = find_interface_by_ip_pattern(output, ip_pattern)
-if interface_name and ip_address:
-    # 如果找到了网卡名称和IP地址，则修改其MTU并添加路由
-    change_mtu(interface_name, 1300)
-    add_route(ip_address)
-else:
-    print(f"未找到与IP地址模式 {ip_pattern} 相关的网卡")
+    # 指定要查找的IP地址模式
+    ip_pattern = r'10\.36\.[0-9]+\.[0-9]+'
+    # 查找对应的网卡名称和IP地址
+    interface_name, ip_address = find_interface_by_ip_pattern(output, ip_pattern)
+
+    # 初始化日志内容
+    log_content = f"系统中的网卡和IP地址信息：\n{output}\n"
+
+    if interface_name and ip_address:
+        # 如果找到了网卡名称和IP地址，则修改其MTU并添加路由
+        mtu_log = change_mtu(interface_name, 1300)
+        route_log = add_route(ip_address)
+        log_content += mtu_log + route_log
+    else:
+        print(f"未找到与IP地址模式 {ip_pattern} 相关的网卡")
+        log_content += f"未找到与IP地址模式 {ip_pattern} 相关的网卡\n"
+
+    # 保存日志到文件
+    save_log_to_file(log_content, interface_name if interface_name else "Unknown", ip_pattern)
+
+# 调用主程序
+if __name__ == "__main__":
+    main()
