@@ -42,7 +42,7 @@ jobs:
       shell: pwsh
       run: |
         # 从远程仓库获取所有标签
-        $tags = git ls-remote --tags https://github.com/tangjin2580/OrayAutoConfig.git
+        $tags = git ls-remote --tags https://github.com/tangjin2580/NetConf.git
         $tagVersions = @()
         
         # 筛选并处理标签
