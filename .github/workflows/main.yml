@@ -53,6 +53,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/main.exe
-        asset_name: OrayAutoConfig.exe
+        asset_path: dist/conf.exe
+        asset_name: NetConf.exe
         asset_content_type: application/octet-stream
