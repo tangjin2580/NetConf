@@ -7,8 +7,10 @@ def save_log_to_file(log, interface_name, ip_pattern):
     try:
         # 获取当前时间戳
         timestamp = datetime.datetime.now().strftime('%Y%m%d')
+        print(f"生成的时间戳为: {timestamp}")
         # 构建文件名
         filename = f"医保ip信息_log_{timestamp}_勿删.txt"
+        print(f"构建的文件名为: {filename}")
         # 打开文件并写入日志
         with open(filename, 'w', encoding='utf-8') as file:
             file.write(log)
@@ -30,23 +32,27 @@ def print_interfaces_and_ips():
 
 # 这个函数用于查找与指定IP地址模式相关的网卡名称，并返回匹配的IP地址
 def find_interface_by_ip_pattern(output, ip_pattern):
+    print(f"开始查找与IP地址模式 {ip_pattern} 相关的网卡名称")
     try:
         # 按行分割命令输出
         lines = output.split('\n')
         for i, line in enumerate(lines):
-            # 查找包含“以太网适配器”的行
-            if '以太网适配器' in line:
-                # 提取以太网适配器名称
-                interface_name = line.split('以太网适配器')[1].split(':')[0].strip()
-                print(f"找到的网卡名称: {interface_name}")
-                # 检查接下来的行是否有匹配的IP地址
-                for j in range(i + 1, len(lines)):
-                    ip_match = re.search(r'IPv4 地址 .+? (\d+\.\d+\.\d+\.\d+)', lines[j])
-                    if ip_match:
-                        ip_address = ip_match.group(1)
-                        print(f"找到的IPv4地址: {ip_address}")
-                        if re.match(ip_pattern, ip_address):
+            ip_match = re.search(r'IPv4 地址 .+? (\d+\.\d+\.\d+\.\d+)', line)
+            if ip_match:
+                ip_address = ip_match.group(1)
+                print(f"找到的IPv4地址: {ip_address}")
+                if re.match(ip_pattern, ip_address):
+                    # 查找前一行的网卡名称
+                    for j in range(i - 1, -1, -1):
+                        if '以太网适配器' in lines[j]:
+                            interface_name = lines[j].split('以太网适配器')[1].split(':')[0].strip()
+                            print(f"匹配的网卡名称和IP地址: {interface_name}, {ip_address}")
                             return interface_name, ip_address
+                        elif '以太网' in lines[j]:
+                            interface_name = lines[j].split('以太网')[1].split(':')[0].strip()
+                            print(f"匹配的网卡名称和IP地址: {interface_name}, {ip_address}")
+                            return interface_name, ip_address
+        print("未找到与IP地址模式相关的网卡")
         return None, None
     except Exception as e:
         print(f"查找网卡时出错: {e}")
@@ -54,6 +60,7 @@ def find_interface_by_ip_pattern(output, ip_pattern):
 
 # 这个函数用于修改指定网卡的MTU
 def change_mtu(interface_name, mtu):
+    print(f"开始修改网卡 {interface_name} 的MTU为 {mtu}")
     try:
         # 使用netsh命令在Windows上修改网卡的MTU
         command = ['netsh', 'interface', 'ipv4', 'set', 'interface', interface_name, 'mtu={}'.format(mtu)]
@@ -67,11 +74,14 @@ def change_mtu(interface_name, mtu):
 
 # 这个函数用于添加路由
 def add_route(ip_address):
+    print(f"开始添加路由，目标网络为 10.0.0.0，IP地址为 {ip_address}")
     try:
         # 提取IP地址的前三段
         network_segment = '.'.join(ip_address.split('.')[:-1])
+        print(f"提取的网络段为: {network_segment}")
         # 构建网关地址
         gateway = f"{network_segment}.1"
+        print(f"构建的网关地址为: {gateway}")
         # 使用route命令添加路由
         command = ['route', '-p', 'add', '10.0.0.0', 'mask', '255.0.0.0', gateway]
         print(f"执行的命令: {' '.join(command)}")
@@ -84,18 +94,18 @@ def add_route(ip_address):
 
 # 主程序
 def main():
+    print("开始主程序")
     # 打印系统中的所有网卡和IP地址
     output = print_interfaces_and_ips()
-
     # 指定要查找的IP地址模式
     ip_pattern = r'10\.36\.[0-9]+\.[0-9]+'
+    print(f"指定的IP地址模式为: {ip_pattern}")
     # 查找对应的网卡名称和IP地址
     interface_name, ip_address = find_interface_by_ip_pattern(output, ip_pattern)
-
     # 初始化日志内容
     log_content = f"系统中的网卡和IP地址信息：\n{output}\n"
-
     if interface_name and ip_address:
+        print(f"找到了网卡 {interface_name} 和IP地址 {ip_address}")
         # 如果找到了网卡名称和IP地址，则修改其MTU并添加路由
         mtu_log = change_mtu(interface_name, 1300)
         route_log = add_route(ip_address)
@@ -103,7 +113,6 @@ def main():
     else:
         print(f"未找到与IP地址模式 {ip_pattern} 相关的网卡")
         log_content += f"未找到与IP地址模式 {ip_pattern} 相关的网卡\n"
-
     # 保存日志到文件
     save_log_to_file(log_content, interface_name if interface_name else "Unknown", ip_pattern)
 
