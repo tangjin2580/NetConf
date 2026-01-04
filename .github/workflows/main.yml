@@ -34,7 +34,7 @@ jobs:
       run: pip install pyinstaller
 
     - name: Build .exe
-      run: pyinstaller --onefile --icon=icon.ico Conf.py
+      run: pyinstaller -F -w --icon=icon.ico Conf.py
 
 
     - name: Get current version
