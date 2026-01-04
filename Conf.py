@@ -1,121 +1,157 @@
 import subprocess
 import re
-import datetime
+import tkinter as tk
+from tkinter import messagebox
 
-# 定义一个函数用于将日志保存到文件
-def save_log_to_file(log, interface_name, ip_pattern):
-    try:
-        # 获取当前时间戳
-        timestamp = datetime.datetime.now().strftime('%Y%m%d')
-        print(f"生成的时间戳为: {timestamp}")
-        # 构建文件名
-        filename = f"医保ip信息_log_{timestamp}_勿删.txt"
-        print(f"构建的文件名为: {filename}")
-        # 打开文件并写入日志
-        with open(filename, 'w', encoding='utf-8') as file:
-            file.write(log)
-        print(f"日志已成功保存到 {filename}")
-    except Exception as e:
-        print(f"保存日志时出错: {e}")
+# ===================== 获取网卡 & IP =====================
+def get_interfaces():
+    output = subprocess.check_output("ipconfig", shell=True, encoding="gbk", errors="ignore")
 
-# 这个函数用于打印系统中所有的网卡和IP地址，并返回输出以供后续使用
-def print_interfaces_and_ips():
-    try:
-        # 使用ipconfig命令在Windows上获取所有网卡的IP地址信息
-        output = subprocess.check_output(['ipconfig'], shell=True).decode('gbk', errors='replace')
-        print("系统中的网卡和IP地址信息：")
-        print(output)
-        return output
-    except Exception as e:
-        print(f"获取网卡和IP地址时出错: {e}")
-        return str(e)
+    blocks = re.split(r"\r?\n\r?\n", output)
+    interfaces = []
 
-# 这个函数用于查找与指定IP地址模式相关的网卡名称，并返回匹配的IP地址
-def find_interface_by_ip_pattern(output, ip_pattern):
-    print(f"开始查找与IP地址模式 {ip_pattern} 相关的网卡名称")
-    try:
-        # 按行分割命令输出
-        lines = output.split('\n')
-        for i, line in enumerate(lines):
-            ip_match = re.search(r'IPv4 地址 .+? (\d+\.\d+\.\d+\.\d+)', line)
-            if ip_match:
-                ip_address = ip_match.group(1)
-                print(f"找到的IPv4地址: {ip_address}")
-                if re.match(ip_pattern, ip_address):
-                    # 查找前一行的网卡名称
-                    for j in range(i - 1, -1, -1):
-                        if '以太网适配器' in lines[j]:
-                            interface_name = lines[j].split('以太网适配器')[1].split(':')[0].strip()
-                            print(f"匹配的网卡名称和IP地址: {interface_name}, {ip_address}")
-                            return interface_name, ip_address
-                        elif '以太网' in lines[j]:
-                            interface_name = lines[j].split('以太网')[1].split(':')[0].strip()
-                            print(f"匹配的网卡名称和IP地址: {interface_name}, {ip_address}")
-                            return interface_name, ip_address
-        print("未找到与IP地址模式相关的网卡")
-        return None, None
-    except Exception as e:
-        print(f"查找网卡时出错: {e}")
-        return None, str(e)
+    for block in blocks:
+        name_match = re.search(r"适配器\s+(.+?):", block)
+        if not name_match:
+            continue
 
-# 这个函数用于修改指定网卡的MTU
-def change_mtu(interface_name, mtu):
-    print(f"开始修改网卡 {interface_name} 的MTU为 {mtu}")
-    try:
-        # 使用netsh命令在Windows上修改网卡的MTU
-        command = ['netsh', 'interface', 'ipv4', 'set', 'interface', interface_name, 'mtu={}'.format(mtu)]
-        print(f"执行的命令: {' '.join(command)}")
-        subprocess.run(command, check=True)
-        print(f"网卡 {interface_name} 的MTU已成功修改为 {mtu}")
-        return f"执行的命令: {' '.join(command)}\n网卡 {interface_name} 的MTU已成功修改为 {mtu}\n"
-    except Exception as e:
-        print(f"修改MTU时出错: {e}")
-        return f"修改MTU时出错: {e}\n"
+        name = name_match.group(1).strip()
 
-# 这个函数用于添加路由
-def add_route(ip_address):
-    print(f"开始添加路由，目标网络为 10.0.0.0，IP地址为 {ip_address}")
-    try:
-        # 提取IP地址的前三段
-        network_segment = '.'.join(ip_address.split('.')[:-1])
-        print(f"提取的网络段为: {network_segment}")
-        # 构建网关地址
-        gateway = f"{network_segment}.1"
-        print(f"构建的网关地址为: {gateway}")
-        # 使用route命令添加路由
-        command = ['route', '-p', 'add', '10.0.0.0', 'mask', '255.0.0.0', gateway]
-        print(f"执行的命令: {' '.join(command)}")
-        subprocess.run(command, check=True)
-        print(f"已成功添加路由至 10.0.0.0，网关为 {gateway}")
-        return f"执行的命令: {' '.join(command)}\n已成功添加路由至 10.0.0.0，网关为 {gateway}\n"
-    except Exception as e:
-        print(f"添加路由时出错: {e}")
-        return f"添加路由时出错: {e}\n"
+        ip_match = re.search(
+            r"\b(?!169\.254)(\d{1,3}(?:\.\d{1,3}){3})\b",
+            block
+        )
 
-# 主程序
-def main():
-    print("开始主程序")
-    # 打印系统中的所有网卡和IP地址
-    output = print_interfaces_and_ips()
-    # 指定要查找的IP地址模式
-    ip_pattern = r'10\.36\.[0-9]+\.[0-9]+'
-    print(f"指定的IP地址模式为: {ip_pattern}")
-    # 查找对应的网卡名称和IP地址
-    interface_name, ip_address = find_interface_by_ip_pattern(output, ip_pattern)
-    # 初始化日志内容
-    log_content = f"系统中的网卡和IP地址信息：\n{output}\n"
-    if interface_name and ip_address:
-        print(f"找到了网卡 {interface_name} 和IP地址 {ip_address}")
-        # 如果找到了网卡名称和IP地址，则修改其MTU并添加路由
-        mtu_log = change_mtu(interface_name, 1300)
-        route_log = add_route(ip_address)
-        log_content += mtu_log + route_log
-    else:
-        print(f"未找到与IP地址模式 {ip_pattern} 相关的网卡")
-        log_content += f"未找到与IP地址模式 {ip_pattern} 相关的网卡\n"
-    # 保存日志到文件
-    save_log_to_file(log_content, interface_name if interface_name else "Unknown", ip_pattern)
+        ip = ip_match.group(1) if ip_match else "未获取"
 
-# 调用主程序
+        interfaces.append((name, ip))
+
+    return interfaces
+
+
+# ===================== 网络操作 =====================
+def set_static_ip(iface, ip, mask):
+    subprocess.run(
+        f'netsh interface ipv4 set address "{iface}" static {ip} {mask}',
+        shell=True,
+        check=True
+    )
+
+
+def set_dns(iface, dns):
+    subprocess.run(
+        f'netsh interface ipv4 set dns "{iface}" static {dns} primary',
+        shell=True,
+        check=True
+    )
+
+
+def set_mtu(iface, mtu):
+    subprocess.run(
+        f'netsh interface ipv4 set subinterface "{iface}" mtu={mtu} store=persistent',
+        shell=True,
+        check=True
+    )
+
+
+def add_route(gateway):
+    subprocess.run(
+        f'route -p add 10.0.0.0 mask 255.0.0.0 {gateway}',
+        shell=True,
+        check=True
+    )
+
+
+def modify_hosts():
+    hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
+    entries = [
+        "10.37.224.243 hisips.shx.hsip.gov.cn",
+        "10.37.225.216 fms.shx.hsip.gov.cn",
+        "10.37.231.230 cts-svc.shx.hsip.gov.cn",
+    ]
+
+    with open(hosts_path, "a", encoding="utf-8") as f:
+        f.write("\n# 医保系统\n")
+        for e in entries:
+            f.write(e + "\n")
+
+
+# ===================== GUI =====================
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("网络配置工具")
+
+        self.ifaces = get_interfaces()
+        if not self.ifaces:
+            messagebox.showerror("错误", "未获取到任何网卡")
+            root.destroy()
+            return
+
+        self.page1()
+
+    def page1(self):
+        self.clear()
+
+        tk.Label(self.root, text="选择网卡", font=("微软雅黑", 12)).pack(pady=5)
+
+        self.lb = tk.Listbox(self.root, width=50, height=8)
+        for n, ip in self.ifaces:
+            self.lb.insert(tk.END, f"{n}    [{ip}]")
+        self.lb.pack()
+
+        tk.Button(self.root, text="下一步", command=self.page2).pack(pady=10)
+
+    def page2(self):
+        sel = self.lb.curselection()
+        if not sel:
+            messagebox.showerror("错误", "请选择网卡")
+            return
+
+        self.iface = self.ifaces[sel[0]][0]
+
+        self.clear()
+
+        tk.Label(self.root, text=f"网卡：{self.iface}", fg="blue").pack(pady=5)
+
+        self.ip = self.entry("IP 地址")
+        self.mask = self.entry("子网掩码", "255.255.255.0")
+        self.dns = self.entry("DNS", "114.114.114.114")
+
+        tk.Button(self.root, text="开始配置", command=self.apply).pack(pady=10)
+
+    def apply(self):
+        try:
+            set_static_ip(self.iface, self.ip.get(), self.mask.get())
+            set_dns(self.iface, self.dns.get())
+
+            gw = ".".join(self.ip.get().split(".")[:-1]) + ".1"
+            add_route(gw)
+
+            set_mtu(self.iface, 1300)
+            modify_hosts()
+
+            messagebox.showinfo("完成", "配置完成，请重新插拔网线")
+            self.root.destroy()
+        except Exception as e:
+            messagebox.showerror("失败", str(e))
+
+    def entry(self, label, default=""):
+        frame = tk.Frame(self.root)
+        frame.pack(pady=3)
+        tk.Label(frame, text=label, width=10).pack(side=tk.LEFT)
+        e = tk.Entry(frame, width=30)
+        e.pack(side=tk.LEFT)
+        e.insert(0, default)
+        return e
+
+    def clear(self):
+        for w in self.root.winfo_children():
+            w.destroy()
+
+
+# ===================== 启动 =====================
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    App(root)
+    root.mainloop()
