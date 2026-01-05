@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox
 import ctypes
 import sys
+import webbrowser
 
 # ===================== 管理员权限检测 =====================
 def is_admin():
@@ -18,7 +19,7 @@ if not is_admin():
     messagebox.showerror("权限不足", "请右键以【管理员身份】运行本程序")
     sys.exit(1)
 
-# ===================== 获取网卡 + IPv4 =====================
+# ===================== 获取网卡 + IPv4（原逻辑，未改） =====================
 def get_interfaces():
     output = subprocess.check_output(
         "ipconfig /all",
@@ -58,7 +59,6 @@ def get_interfaces():
 
     return interfaces
 
-
 # ===================== 系统命令 =====================
 def run(cmd):
     subprocess.run(cmd, shell=True, check=True)
@@ -87,13 +87,39 @@ def modify_hosts():
         for e in entries:
             f.write(e + '\n')
 
+# ===================== 校验信息获取 =====================
+def get_mtu_by_iface(iface):
+    """
+    使用：
+    netsh interface ipv4 show interface <iface>
+    正则匹配 MTU，最终返回 mtu=1300
+    """
+    output = subprocess.check_output(
+        f'netsh interface ipv4 show interface "{iface}"',
+        shell=True,
+        encoding='gbk',
+        errors='ignore'
+    )
+
+    match = re.search(r'MTU\s*:\s*(\d+)', output)
+    if match:
+        return f"mtu={match.group(1)}"
+    return "mtu=未知"
+
+def get_routes():
+    return subprocess.check_output(
+        'route print -4',
+        shell=True,
+        encoding='gbk',
+        errors='ignore'
+    )
 
 # ===================== GUI =====================
 class App:
     def __init__(self, root):
         self.root = root
         self.root.title("医保网络配置工具")
-        self.root.geometry("600x420")
+        self.root.geometry("720x560")
         self.root.resizable(False, False)
         self.root.configure(bg="#F5F7FA")
 
@@ -113,14 +139,12 @@ class App:
     def page_select(self):
         self.clear()
 
-        # 标题
         tk.Label(
             self.root, text="医保网络配置工具",
-            font=self.font_title, bg="#2F6FED", fg="white",
-            pady=12
+            font=self.font_title, bg="#2F6FED", fg="white", pady=12
         ).pack(fill=tk.X)
 
-        card = tk.Frame(self.root, bg="white", bd=1, relief=tk.FLAT)
+        card = tk.Frame(self.root, bg="white")
         card.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
 
         tk.Label(
@@ -128,10 +152,7 @@ class App:
             font=("微软雅黑", 11, "bold"), bg="white"
         ).pack(anchor="w", padx=15, pady=(15, 5))
 
-        self.lb = tk.Listbox(
-            card, width=70, height=8,
-            font=self.font_normal, bd=1, relief=tk.SOLID
-        )
+        self.lb = tk.Listbox(card, width=85, height=8, font=self.font_normal)
         for name, ip in self.ifaces:
             self.lb.insert(tk.END, f"{name}    [{ip}]")
         self.lb.pack(padx=15, pady=5)
@@ -140,16 +161,9 @@ class App:
             card, text="下一步",
             font=self.font_btn,
             bg="#2F6FED", fg="white",
-            activebackground="#1E4ED8",
-            width=14, height=1,
+            width=14,
             command=self.page_config
         ).pack(pady=15)
-
-        tk.Label(
-            self.root,
-            text="提示：请确认当前电脑已连接医保专网",
-            bg="#F5F7FA", fg="#666", font=("微软雅黑", 9)
-        ).pack(pady=(0, 10))
 
     # ---------- 页面 2 ----------
     def page_config(self):
@@ -163,8 +177,7 @@ class App:
 
         tk.Label(
             self.root, text="网络参数配置",
-            font=self.font_title, bg="#2F6FED", fg="white",
-            pady=12
+            font=self.font_title, bg="#2F6FED", fg="white", pady=12
         ).pack(fill=tk.X)
 
         card = tk.Frame(self.root, bg="white")
@@ -172,7 +185,7 @@ class App:
 
         tk.Label(
             card, text=f"当前网卡：{self.iface}",
-            bg="white", fg="#333", font=("微软雅黑", 10, "bold")
+            bg="white", font=("微软雅黑", 10, "bold")
         ).pack(anchor="w", padx=15, pady=(15, 10))
 
         self.ip = self.add_entry(card, "IP 地址", "10.36.")
@@ -183,7 +196,6 @@ class App:
             card, text="开始配置",
             font=self.font_btn,
             bg="#16A34A", fg="white",
-            activebackground="#15803D",
             width=16,
             command=self.apply
         ).pack(pady=20)
@@ -197,6 +209,7 @@ class App:
         e.insert(0, default)
         return e
 
+    # ---------- 应用配置 ----------
     def apply(self):
         try:
             ip = self.ip.get().strip()
@@ -212,15 +225,77 @@ class App:
             set_mtu(self.iface, 1300)
             modify_hosts()
 
-            messagebox.showinfo("完成", "配置完成，请重新插拔网线")
-            self.root.destroy()
+            messagebox.showinfo("完成", "配置完成，进入校验页面")
+            self.page_verify()
+
         except Exception as e:
             messagebox.showerror("失败", str(e))
+
+    # ---------- 页面 3：校验 ----------
+    def page_verify(self):
+        self.clear()
+
+        tk.Label(
+            self.root, text="配置校验",
+            font=self.font_title, bg="#2F6FED", fg="white", pady=12
+        ).pack(fill=tk.X)
+
+        card = tk.Frame(self.root, bg="white")
+        card.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+        # 实时 IP
+        current_ifaces = get_interfaces()
+        ip = "未获取"
+        for name, addr in current_ifaces:
+            if name == self.iface:
+                ip = addr
+                break
+
+        mtu = get_mtu_by_iface(self.iface)
+        routes = get_routes()
+
+        def row(k, v):
+            f = tk.Frame(card, bg="white")
+            f.pack(anchor="w", padx=15, pady=6, fill=tk.X)
+            tk.Label(f, text=k, width=12, bg="white",
+                     font=("微软雅黑", 10, "bold")).pack(side=tk.LEFT)
+            tk.Label(f, text=v, bg="white",
+                     justify="left").pack(side=tk.LEFT)
+
+        row("网卡名称", self.iface)
+        row("IPv4 地址", ip)
+        row("MTU", mtu)
+
+        tk.Label(card, text="IPv4 路由表",
+                 bg="white", font=("微软雅黑", 10, "bold")).pack(anchor="w", padx=15, pady=(15, 5))
+
+        txt = tk.Text(card, height=10, width=95, font=("Consolas", 9))
+        txt.pack(padx=15)
+        txt.insert(tk.END, routes)
+        txt.config(state=tk.DISABLED)
+
+        link = tk.Label(
+            card,
+            text="hisips.shx.hsip.gov.cn",
+            fg="#2563EB",
+            bg="white",
+            cursor="hand2",
+            font=("微软雅黑", 10, "underline")
+        )
+        link.pack(anchor="w", padx=15, pady=10)
+        link.bind("<Button-1>", lambda e: webbrowser.open("http://hisips.shx.hsip.gov.cn"))
+
+        tk.Button(
+            card, text="关闭",
+            font=self.font_btn,
+            bg="#6B7280", fg="white",
+            width=12,
+            command=self.root.destroy
+        ).pack(pady=15)
 
     def clear(self):
         for w in self.root.winfo_children():
             w.destroy()
-
 
 # ===================== 启动 =====================
 if __name__ == "__main__":
