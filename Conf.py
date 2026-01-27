@@ -968,13 +968,14 @@ class App:
         server_info_frame = tk.Frame(right_frame, bg="white")
         server_info_frame.pack(fill=tk.X, pady=(0, 10))
         
-        tk.Label(server_info_frame, text="服务器:", bg="white", font=("微软雅黑", 9)).pack(side=tk.LEFT)
-        self.server_display = tk.Label(server_info_frame, text=self.server_url_value,
-                                      bg="white", fg="#2563EB", font=("微软雅黑", 9))
-        self.server_display.pack(side=tk.LEFT, padx=5)
-        
-        tk.Label(server_info_frame, text="  (点击标题栏3次修改)", bg="white",
-                fg="#9CA3AF", font=("微软雅黑", 8)).pack(side=tk.LEFT)
+        # tk.Label(server_info_frame, text="服务器:", bg="white", font=("微软雅黑", 9)).pack(side=tk.LEFT)
+        # self.server_display = tk.Label(server_info_frame, text=self.server_url_value,
+        #                               bg="white", fg="#2563EB", font=("微软雅黑", 9))
+        # self.server_display.pack(side=tk.LEFT, padx=5)
+
+        #隐藏配置接口
+        # tk.Label(server_info_frame, text="  (点击标题栏3次修改)", bg="white",
+        #         fg="#9CA3AF", font=("微软雅黑", 8)).pack(side=tk.LEFT)
 
         # 服务器管理按钮
         server_btn_frame = tk.Frame(right_frame, bg="white")
@@ -982,8 +983,8 @@ class App:
         
         tk.Button(server_btn_frame, text="刷新信息", command=self.page_info_display,
                  bg="#2563EB", fg="white", font=("微软雅黑", 9), width=10).pack(side=tk.LEFT, padx=(0, 5))
-        tk.Button(server_btn_frame, text="打开服务器", command=self.open_server_url,
-                 bg="#16A34A", fg="white", font=("微软雅黑", 9), width=10).pack(side=tk.LEFT, padx=(0, 5))
+        # tk.Button(server_btn_frame, text="打开服务器", command=self.open_server_url,
+        #          bg="#16A34A", fg="white", font=("微软雅黑", 9), width=10).pack(side=tk.LEFT, padx=(0, 5))
 
         # 服务器状态
         self.server_status = tk.Label(right_frame, text="未检测到服务器", bg="white", fg="#6B7280", font=("微软雅黑", 9))
