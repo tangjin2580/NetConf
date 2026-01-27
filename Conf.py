@@ -38,9 +38,15 @@ def check_sunflower_installed():
         r"C:\Program Files (x86)\Oray\SunLogin\SunloginClient.exe",
         r"C:\Program Files\Oray\SunLogin\AweSun.exe",
         r"C:\Program Files (x86)\Oray\SunLogin\AweSun.exe",
+        r"D:\Program Files\Oray\SunLogin\SunloginClient.exe",
+        r"D:\Program Files (x86)\Oray\SunLogin\SunloginClient.exe",
+        r"D:\Program Files\Oray\SunLogin\AweSun.exe",
+        r"D:\Program Files (x86)\Oray\SunLogin\AweSun.exe",
         # 旧版向日葵路径
         r"C:\Program Files\Oray\SunLogin\SunloginClient\sunlogin.exe",
         r"C:\Program Files (x86)\Oray\SunLogin\SunloginClient\sunlogin.exe",
+        r"D:\Program Files\Oray\SunLogin\SunloginClient\sunlogin.exe",
+        r"D:\Program Files (x86)\Oray\SunLogin\SunloginClient\sunlogin.exe",
         # 用户目录下的路径
         r"C:\Users\%USERNAME%\AppData\Local\Oray\SunLogin\SunloginClient\AweSun.exe",
         r"C:\Users\%USERNAME%\AppData\Local\Oray\SunLogin\AweSun.exe",
@@ -570,6 +576,39 @@ def test_host_connectivity(host, port=80, timeout=3):
     except:
         return False
 
+def ping_host(host, count=4):
+    """ping指定主机，返回是否成功和结果信息"""
+    try:
+        # Windows系统使用 -n 参数
+        output = subprocess.check_output(
+            f"ping -n {count} {host}",
+            shell=True,
+            encoding="gbk",
+            errors="ignore",
+            timeout=10
+        )
+        # 检查是否有成功的响应
+        if "TTL=" in output or "ms" in output:
+            # 提取统计信息
+            if "已发送 = " in output:
+                # 中文版本
+                match = re.search(r'已发送 = (\d+)，已接收 = (\d+)，丢失 = (\d+)', output)
+                if match:
+                    sent, received, lost = match.groups()
+                    return True, f"已发送 {sent} 个，已接收 {received} 个，丢失 {lost} 个"
+            elif "Sent = " in output:
+                # 英文版本
+                match = re.search(r'Sent = (\d+), Received = (\d+), Lost = (\d+)', output)
+                if match:
+                    sent, received, lost = match.groups()
+                    return True, f"Sent {sent}, Received {received}, Lost {lost}"
+            return True, "ping 成功"
+        return False, "ping 失败，无响应"
+    except subprocess.TimeoutExpired:
+        return False, "ping 超时"
+    except Exception as e:
+        return False, f"ping 失败: {str(e)}"
+
 # ===================== 线程工具 =====================
 def run_in_thread(func, on_done=None, on_error=None):
     def wrapper():
@@ -711,8 +750,131 @@ class App:
 
         tk.Label(card, text="请选择配置模式", font=("微软雅黑", 13, "bold"), bg="white").pack(pady=30)
 
+        self.create_button(card, "🔍 医保网络检测", self.page_medical_network_check, color="#16A34A")
         self.create_button(card, "🌐 双WAN配置（路由器）", self.page_dual_wan, color="#7C3AED")
         self.create_button(card, "💻 单机配置（直连）", self.page_standalone_menu, color="#2563EB")
+
+    # ---------- 医保网络检测页面 ----------
+    def page_medical_network_check(self):
+        self.clear()
+        tk.Label(self.root, text="医保网络检测", font=self.font_title, bg="#16A34A", fg="white", pady=14).pack(fill=tk.X)
+
+        card = tk.Frame(self.root, bg="white")
+        card.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
+
+        # 返回按钮
+        top_btn_frame = tk.Frame(card, bg="white")
+        top_btn_frame.pack(fill=tk.X, pady=(0, 15))
+        tk.Button(top_btn_frame, text="← 返回", command=self.page_main_menu,
+                 bg="#6B7280", fg="white", font=("微软雅黑", 10), width=10).pack(side=tk.LEFT)
+
+        # 检测结果标题
+        tk.Label(card, text="正在检测医保网络连通性...", font=("微软雅黑", 12, "bold"), bg="white").pack(pady=(10, 20))
+
+        # 创建结果展示区域
+        result_frame = tk.LabelFrame(card, text="检测结果", font=("微软雅黑", 11, "bold"), bg="white", padx=15, pady=15)
+        result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # 检测项1：ping 10.35.128.1
+        ping_frame = tk.Frame(result_frame, bg="white")
+        ping_frame.pack(fill=tk.X, pady=10)
+        tk.Label(ping_frame, text="医保网关 (10.35.128.1):", width=30, bg="white", font=("微软雅黑", 10, "bold"), anchor="w").pack(side=tk.LEFT)
+        ping_status = tk.Label(ping_frame, text="检测中...", bg="white", fg="#F59E0B", font=("微软雅黑", 10))
+        ping_status.pack(side=tk.LEFT, padx=10)
+
+        # 检测项2：hisips.shx.hsip.gov.cn
+        hisips_frame = tk.Frame(result_frame, bg="white")
+        hisips_frame.pack(fill=tk.X, pady=10)
+        tk.Label(hisips_frame, text="两定系统 (hisips):", width=30, bg="white", font=("微软雅黑", 10, "bold"), anchor="w").pack(side=tk.LEFT)
+        hisips_status = tk.Label(hisips_frame, text="检测中...", bg="white", fg="#F59E0B", font=("微软雅黑", 10))
+        hisips_status.pack(side=tk.LEFT, padx=10)
+
+        # 检测项3：fms.shx.hsip.gov.cn
+        fms_frame = tk.Frame(result_frame, bg="white")
+        fms_frame.pack(fill=tk.X, pady=10)
+        tk.Label(fms_frame, text="费用监管系统 (fms):", width=30, bg="white", font=("微软雅黑", 10, "bold"), anchor="w").pack(side=tk.LEFT)
+        fms_status = tk.Label(fms_frame, text="检测中...", bg="white", fg="#F59E0B", font=("微软雅黑", 10))
+        fms_status.pack(side=tk.LEFT, padx=10)
+
+        # 检测项4：cts-svc.shx.hsip.gov.cn
+        cts_frame = tk.Frame(result_frame, bg="white")
+        cts_frame.pack(fill=tk.X, pady=10)
+        tk.Label(cts_frame, text="综合服务系统 (cts-svc):", width=30, bg="white", font=("微软雅黑", 10, "bold"), anchor="w").pack(side=tk.LEFT)
+        cts_status = tk.Label(cts_frame, text="检测中...", bg="white", fg="#F59E0B", font=("微软雅黑", 10))
+        cts_status.pack(side=tk.LEFT, padx=10)
+
+        # 详细信息显示区域
+        detail_frame = tk.LabelFrame(card, text="详细信息", font=("微软雅黑", 10, "bold"), bg="white", padx=10, pady=10)
+        detail_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        detail_text = scrolledtext.ScrolledText(detail_frame, wrap=tk.WORD, font=("微软雅黑", 9), height=8)
+        detail_text.pack(fill=tk.BOTH, expand=True)
+
+        # 按钮区域
+        btn_frame = tk.Frame(card, bg="white")
+        btn_frame.pack(pady=15)
+        
+        refresh_btn = tk.Button(btn_frame, text="🔄 重新检测", command=self.page_medical_network_check,
+                               bg="#2563EB", fg="white", font=("微软雅黑", 10, "bold"), width=15, height=2)
+        refresh_btn.pack(side=tk.LEFT, padx=10)
+
+        # 异步执行检测
+        def run_checks():
+            detail_text.insert(tk.END, f"开始检测时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            detail_text.insert(tk.END, "=" * 60 + "\n\n")
+            
+            # 1. ping 10.35.128.1
+            detail_text.insert(tk.END, "【检测1】ping 医保网关 10.35.128.1\n")
+            ping_success, ping_msg = ping_host("10.35.128.1", count=4)
+            if ping_success:
+                ping_status.config(text=f"✓ 连通 ({ping_msg})", fg="#16A34A")
+                detail_text.insert(tk.END, f"结果: ✓ 成功 - {ping_msg}\n\n")
+            else:
+                ping_status.config(text=f"✗ 不通 ({ping_msg})", fg="#EF4444")
+                detail_text.insert(tk.END, f"结果: ✗ 失败 - {ping_msg}\n\n")
+            
+            # 2. hisips.shx.hsip.gov.cn
+            detail_text.insert(tk.END, "【检测2】两定系统 hisips.shx.hsip.gov.cn\n")
+            hisips_ok = test_host_connectivity("hisips.shx.hsip.gov.cn", port=80, timeout=5)
+            if hisips_ok:
+                hisips_status.config(text="✓ 可访问", fg="#16A34A")
+                detail_text.insert(tk.END, "结果: ✓ 可访问\n\n")
+            else:
+                hisips_status.config(text="✗ 无法访问", fg="#EF4444")
+                detail_text.insert(tk.END, "结果: ✗ 无法访问\n\n")
+            
+            # 3. fms.shx.hsip.gov.cn
+            detail_text.insert(tk.END, "【检测3】费用监管系统 fms.shx.hsip.gov.cn\n")
+            fms_ok = test_host_connectivity("fms.shx.hsip.gov.cn", port=80, timeout=5)
+            if fms_ok:
+                fms_status.config(text="✓ 可访问", fg="#16A34A")
+                detail_text.insert(tk.END, "结果: ✓ 可访问\n\n")
+            else:
+                fms_status.config(text="✗ 无法访问", fg="#EF4444")
+                detail_text.insert(tk.END, "结果: ✗ 无法访问\n\n")
+            
+            # 4. cts-svc.shx.hsip.gov.cn
+            detail_text.insert(tk.END, "【检测4】综合服务系统 cts-svc.shx.hsip.gov.cn\n")
+            cts_ok = test_host_connectivity("cts-svc.shx.hsip.gov.cn", port=80, timeout=5)
+            if cts_ok:
+                cts_status.config(text="✓ 可访问", fg="#16A34A")
+                detail_text.insert(tk.END, "结果: ✓ 可访问\n\n")
+            else:
+                cts_status.config(text="✗ 无法访问", fg="#EF4444")
+                detail_text.insert(tk.END, "结果: ✗ 无法访问\n\n")
+            
+            # 总结
+            detail_text.insert(tk.END, "=" * 60 + "\n")
+            all_ok = ping_success and hisips_ok and fms_ok and cts_ok
+            if all_ok:
+                detail_text.insert(tk.END, "✓ 所有检测项通过，医保网络正常！\n")
+            else:
+                detail_text.insert(tk.END, "⚠ 部分检测项未通过，请检查网络配置\n")
+            
+            detail_text.see(tk.END)
+        
+        # 在后台线程运行检测
+        run_in_thread(run_checks)
 
     # ---------- 双WAN配置页面 ----------
     def page_dual_wan(self):
@@ -997,6 +1159,25 @@ class App:
             except Exception as e:
                 results.append(f"✗ MTU设置失败: {str(e)}")
             
+            # 获取当前路由配置（单路由配置）
+            try:
+                route_output = subprocess.check_output(
+                    'route print -4',
+                    shell=True,
+                    encoding='gbk',
+                    errors='ignore'
+                )
+                # 检查是否存在10.0.0.0路由
+                if '10.0.0.0' in route_output:
+                    results.append("\n【单路由配置信息】")
+                    for line in route_output.splitlines():
+                        if '10.0.0.0' in line:
+                            results.append(f"  {line.strip()}")
+                else:
+                    results.append("\n【单路由配置】未检测到10.0.0.0路由")
+            except Exception as e:
+                results.append(f"\n✗ 获取路由信息失败: {str(e)}")
+            
             return results
 
         def on_done(results):
@@ -1015,6 +1196,12 @@ class App:
 
         card = tk.Frame(self.root, bg="white")
         card.pack(padx=40, pady=40, fill=tk.BOTH, expand=True)
+
+        # 返回按钮
+        top_btn_frame = tk.Frame(card, bg="white")
+        top_btn_frame.pack(fill=tk.X, pady=(0, 15))
+        tk.Button(top_btn_frame, text="← 返回", command=self.page_main_menu,
+                 bg="#6B7280", fg="white", font=("微软雅黑", 10), width=10).pack(side=tk.LEFT)
 
         tk.Label(card, text="请选择功能", font=("微软雅黑", 13, "bold"), bg="white").pack(pady=30)
 
@@ -1126,6 +1313,12 @@ class App:
 
         card = tk.Frame(self.root, bg="white")
         card.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+        # 返回按钮
+        top_btn_frame = tk.Frame(card, bg="white")
+        top_btn_frame.pack(fill=tk.X, pady=(0, 15))
+        tk.Button(top_btn_frame, text="← 返回", command=self.page_select,
+                 bg="#6B7280", fg="white", font=("微软雅黑", 10), width=10).pack(side=tk.LEFT)
 
         tk.Label(card, text=f"当前网卡：{self.iface}", bg="white", font=("微软雅黑", 10, "bold")).pack(anchor="w", padx=15, pady=(15, 10))
 
