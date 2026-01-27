@@ -1,0 +1,53 @@
+name: Build .exe with PyInstaller and Create Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build .exe with spec file
+      run: |
+        pyinstaller Conf.spec --distpath dist --workpath build --clean
+    
+    - name: Get version from tag
+      id: version
+      run: |
+        git fetch --tags
+        $tag = git describe --tags --abbrev=0 2>$null
+        if (-not $tag) { $tag = "v1.0.0" }
+        echo "version=$tag" >> $env:GITHUB_OUTPUT
+        echo "当前版本: $tag"
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/医保网络配置工具.exe
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
