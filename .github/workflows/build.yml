@@ -1,0 +1,145 @@
+name: Build and Release Medical Network Tool
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build executable
+      run: |
+        pyinstaller --clean --onefile --windowed `
+          --hidden-import=config.settings `
+          --hidden-import=core.network `
+          --hidden-import=core.hosts `
+          --hidden-import=core.system `
+          --hidden-import=utils.cache `
+          --hidden-import=utils.server `
+          --add-data "config;config" `
+          --add-data "core;core" `
+          --add-data "utils;utils" `
+          --name="医保网络配置工具" `
+          $(if (Test-Path "icon.ico") { "--icon=icon.ico" } else { "" }) `
+          main.py
+
+    - name: Build server executable (optional)
+      run: |
+        pyinstaller --clean --onefile `
+          --name="医保配置服务器" `
+          $(if (Test-Path "icon.ico") { "--icon=icon.ico" } else { "" }) `
+          server.py
+      continue-on-error: true
+
+    - name: Get current version
+      id: get_version
+      shell: pwsh
+      run: |
+        # 获取所有标签
+        git fetch --tags
+        $tags = git tag -l "v*.*.*" | Sort-Object { 
+          [version]($_ -replace 'v','') 
+        } -Descending
+        
+        if ($tags) {
+          $latestTag = $tags[0]
+          $version = $latestTag -replace 'v',''
+          $parts = $version.Split('.')
+          $major = [int]$parts[0]
+          $minor = [int]$parts[1]
+          $patch = [int]$parts[2] + 1
+          $newVersion = "v$major.$minor.$patch"
+        } else {
+          $newVersion = "v1.0.0"
+        }
+        
+        echo "new_version=$newVersion" >> $env:GITHUB_ENV
+        echo "NEW_VERSION=$newVersion" >> $env:GITHUB_OUTPUT
+        Write-Host "生成的新版本号: $newVersion"
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.NEW_VERSION }}
+        release_name: 医保网络配置工具 ${{ steps.get_version.outputs.NEW_VERSION }}
+        body: |
+          ## 🎉 医保网络配置工具 ${{ steps.get_version.outputs.NEW_VERSION }}
+          
+          ### ✨ 主要功能
+          - 🔍 医保网络检测（ping + 连通性测试）
+          - 🌐 双WAN配置（路由器模式）
+          - 💻 单机配置（直连模式）
+          - 🧾 Hosts文件管理
+          - 📡 配置信息服务器（支持在线编辑）
+          
+          ### 📦 下载说明
+          - **医保网络配置工具.exe** - 主程序（需管理员权限运行）
+          - **医保配置服务器.exe** - 配置服务器（可选，默认端口8080）
+          
+          ### 📋 使用要求
+          - Windows 7/8/10/11
+          - 需要管理员权限
+          - .NET Framework 4.5+ (通常系统自带)
+          
+          ### 🔧 更新内容
+          - 模块化架构重构
+          - 新增在线编辑文本文件功能
+          - 优化用户界面和体验
+          - 完善医保网络检测功能
+        draft: false
+        prerelease: false
+
+    - name: Upload Main Executable
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/医保网络配置工具.exe
+        asset_name: 医保网络配置工具.exe
+        asset_content_type: application/octet-stream
+
+    - name: Upload Server Executable (optional)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/医保配置服务器.exe
+        asset_name: 医保配置服务器.exe
+        asset_content_type: application/octet-stream
+      continue-on-error: true
+
+    - name: Upload artifacts for debugging
+      uses: actions/upload-artifact@v3
+      with:
+        name: executables
+        path: dist/*.exe
+        retention-days: 7

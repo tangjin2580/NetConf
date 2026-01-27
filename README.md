@@ -1,112 +1,134 @@
 # 医保网络配置工具
 
-针对 Windows 7 - Windows 11 的医保网络配置工具，支持静态IP、路由、MTU和hosts文件配置。
+现代化的医保网络配置工具，支持双WAN配置、单机配置、网络检测等功能。
 
-## 功能特性
-
-### 1. 双WAN配置（路由器）
-- **自动获取路由器IP**：从路由表自动检测默认网关（0.0.0.0 mask 0.0.0.0）
-- **向日葵远程控制**：检测与启动远程协助
-- **一键设置MTU**：自动将所有网卡MTU设置为1300（无需勾选）
-- **信息管理服务器**：内置HTTP服务器，支持：
-  - 文件管理（上传、下载、删除）
-  - 在线编辑txt/md文件
-  - 下载协议支持
-
-### 2. 单机配置（直连）
-- hosts文件智能补全（检查缺失条目）
-- 单网卡IP/MTU/路由配置
-- 配置状态校验
-- 医保地址连通性测试
-
-## 使用方法
-
-### 1. 运行程序
-```bash
-# 使用Python直接运行
-python Conf.py
-
-# 或双击Conf.py运行
-```
-
-### 2. 双WAN配置
-- 程序会自动从路由表获取路由器IP
-- 如未检测到，可手动输入
-- 点击"开始双WAN配置"一键设置所有网卡MTU=1300
-
-### 3. 信息管理服务器
-在双WAN配置页面右侧：
-1. 点击"启动服务器"按钮
-2. 浏览器访问：`http://localhost:8080`
-3. 支持功能：
-   - 查看文件列表
-   - 上传新文件
-   - 在线编辑文本文件
-   - 下载文件
-
-## API接口
-
-### 列出文件
-```
-GET /api/files
-```
-返回所有文件列表（JSON格式）
-
-### 上传文件
-```
-POST /api/upload
-Content-Type: multipart/form-data
-
-file: <文件内容>
-```
-
-### 保存文件
-```
-POST /api/save
-Content-Type: application/json
-
-{
-  "filename": "文件名.txt",
-  "content": "文件内容"
-}
-```
-
-### 下载文件
-```
-GET /download/文件名.txt
-```
-
-## 项目结构
+## 📁 项目结构
 
 ```
 NetConf/
-├── Conf.py              # 主程序文件
-├── Conf.spec            # PyInstaller配置文件
-├── icon.ico             # 程序图标
-├── requirements.txt     # Python依赖
-├── README.md           # 本说明文件
-├── info/               # 信息展示文件夹（服务器根目录）
-│   └── 双WAN配置说明.txt  # 示例文件
-├── .git/               # Git版本控制
-├── .github/            # GitHub配置
-└── .idea/              # PyCharm IDE配置
+├── main.py                    # 主入口文件（原Conf.py）
+├── config/                    # 配置模块
+│   ├── __init__.py
+│   └── settings.py            # 配置常量（服务器、hosts条目等）
+├── core/                      # 核心业务模块
+│   ├── __init__.py
+│   ├── network.py             # 网络工具（IP、MTU、路由、ping等）
+│   ├── hosts.py               # Hosts文件管理
+│   └── system.py              # 系统检查（管理员权限、向日葵等）
+├── utils/                     # 工具模块
+│   ├── __init__.py
+│   ├── cache.py               # 缓存管理
+│   └── server.py              # 服务器通信（含在线编辑功能）
+├── cache/                     # 缓存目录
+├── info/                      # 信息存储目录
+├── server.py                  # HTTP服务器独立启动脚本
+├── requirements.txt           # 依赖列表
+├── Conf.py                    # 旧版主文件（保留备份）
+└── Conf.py.backup            # 原始备份
 ```
 
-## 系统要求
-- Windows 7 / 8 / 10 / 11
-- Python 3.7+
-- 需要管理员权限运行
+## ✨ 主要功能
 
-## 依赖安装
+### 1. 🔍 医保网络检测
+- Ping 10.35.128.1（医保网关）
+- 检测两定系统（hisips.shx.hsip.gov.cn）
+- 检测费用监管系统（fms.shx.hsip.gov.cn）
+- 检测综合服务系统（cts-svc.shx.hsip.gov.cn）
+
+### 2. 🌐 双WAN配置（路由器）
+- 向日葵远程协助
+- 路由器账号配置
+- MTU一键设置（1300）
+- 单路由配置信息返回
+- 配置信息展示（从服务器获取）
+
+### 3. 💻 单机配置（直连）
+- 仅补全 hosts 文件
+- IP / MTU / 路由完整配置
+- 配置验证和连通性测试
+
+### 4. 📡 服务器功能（新增）
+- 文件管理（上传、下载）
+- **在线编辑txt/md/log等文本文件**
+- 自动识别可编辑文件类型
+- Web界面管理
+
+## 🚀 运行方式
+
+### Windows（需要管理员权限）
+```bash
+# 右键点击 main.py -> 以管理员身份运行
+# 或在管理员CMD/PowerShell中运行：
+python main.py
+```
+
+### 启动HTTP服务器（支持在线编辑）
+```bash
+python server.py
+# 默认端口: 8080
+# 访问: http://localhost:8080
+# 默认账号: info / 密码: mecPassw0rd
+```
+
+**server.py 功能特性：**
+- ✅ 文件上传/下载
+- ✅ 在线编辑 txt/md/log/json/xml 等文本文件
+- ✅ 实时保存修改
+- ✅ 文件管理（删除、查看）
+- ✅ 漂亮的Web界面
+
+## 📦 依赖安装
+
 ```bash
 pip install -r requirements.txt
 ```
 
-## 注意事项
-1. **必须以管理员身份运行**（右键 → 以管理员身份运行）
-2. 修改网络配置前建议备份当前设置
-3. MTU修改后可能需要重启网卡生效
-4. 信息服务器默认端口：8080
+主要依赖：
+- tkinter（GUI）
+- Pillow（图片处理）
+- requests（HTTP请求）
 
-## 作者
-tangjin
+## 🔧 打包说明
+
+使用 PyInstaller 打包时注意：
+1. 确保所有模块正确导入
+2. 添加 `--hidden-import` 参数包含所有子模块
+3. 使用 `--add-data` 包含配置文件
+
+示例命令：
+```bash
+pyinstaller --onefile --windowed \
+  --hidden-import=config.settings \
+  --hidden-import=core.network \
+  --hidden-import=core.hosts \
+  --hidden-import=core.system \
+  --hidden-import=utils.cache \
+  --hidden-import=utils.server \
+  --name="医保网络配置工具" \
+  main.py
+```
+
+## 🎯 重构说明
+
+**v2.0 重构（2026-01-27）**
+- ✅ 代码减少 35.3%（58043 → 37579 字符）
+- ✅ 模块化架构（config / core / utils）
+- ✅ 主文件更名为 main.py
+- ✅ 新增在线编辑txt文件功能
+- ✅ 完善的目录结构和文档
+
+**模块分类：**
+- `config/` - 配置常量（服务器、hosts、网络参数等）
+- `core/` - 核心业务（网络操作、hosts管理、系统检查）
+- `utils/` - 工具函数（缓存、服务器通信）
+
+## 📝 更新日志
+
+- **2026-01-27**: v2.0 大重构，模块化架构，增加在线编辑功能
+- **2026-01-27**: 增加医保网络检测功能
+- **2026-01-27**: 增加单路由配置返回
+- **2026-01-27**: 所有页面增加返回上级菜单功能
+
+## 👨‍💻 开发者
+
+- 医保网络配置工具团队
