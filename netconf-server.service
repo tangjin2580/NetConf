@@ -1,0 +1,19 @@
+[Unit]
+Description=NetConf Info Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/NetConf
+ExecStart=/path/to/NetConf/venv/bin/python start_server.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/netconf-server.log
+StandardError=append:/var/log/netconf-server-error.log
+
+# 环境变量
+Environment="PORT=8080"
+
+[Install]
+WantedBy=multi-user.target
