@@ -4,6 +4,7 @@ from PyInstaller.utils.hooks import collect_all
 block_cipher = None
 
 a = Analysis(
+    ['Conf.py'],
     pathex=[],
     binaries=[],
     datas=[],
