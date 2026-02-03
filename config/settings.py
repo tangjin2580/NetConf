@@ -19,7 +19,8 @@ HOSTS_ENTRIES = [
 MEDICAL_HOSTS = [
     "hisips.shx.hsip.gov.cn",
     "fms.shx.hsip.gov.cn",
-    "cts-svc.shx.hsip.gov.cn"
+    "cts-svc.shx.hsip.gov.cn",
+    "10.37.227.210 zfzg.shx.hsip.gov.cn"
 ]
 
 # ===================== 默认网络配置 =====================

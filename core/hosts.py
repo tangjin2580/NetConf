@@ -60,5 +60,6 @@ def hosts_already_set():
     return (
         'hisips.shx.hsip.gov.cn' in content or
         'fms.shx.hsip.gov.cn' in content or
-        'cts-svc.shx.hsip.gov.cn' in content
+        'cts-svc.shx.hsip.gov.cn' in content or
+        'zfzg.shx.hsip.gov.cn' in content
     )
