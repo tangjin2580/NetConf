@@ -7,14 +7,144 @@ import os
 import threading
 from datetime import datetime
 from PIL import Image, ImageTk
+import requests
+import re
+import json
+import time
 
-# 导入新模块
+# 导入配置（包含版本信息）
 from config import *
 from core.network import *
 from core.hosts import *
 from core.system import *
 from utils.cache import *
 from utils.server import *
+
+# ===================== 版本检查工具 =====================
+import os
+from config.settings import LOCAL_VERSION, GITHUB_API_URL, GITHUB_RELEASES_URL, FASTGIT_RELEASES_URL, PROXY_RELEASES_URLS
+
+def check_for_updates():
+    """检查是否有新版本可用"""
+    try:
+        # 使用从settings.py中获取的本地版本
+        local_version = LOCAL_VERSION
+        if not local_version:
+            print("无法读取本地版本号")
+            return None, None, None, None
+
+        # 请求 GitHub 获取最新版本
+        response = requests.get(GITHUB_API_URL, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            latest_version = data.get('tag_name', '').lstrip('v')
+            if latest_version:
+                # 比较版本号
+                if is_update_available(local_version, latest_version):
+                    return latest_version, data.get('html_url', ''), data.get('published_at', ''), data.get('body', '')
+    except Exception as e:
+        print(f"检查更新失败: {e}")
+    return None, None, None, None
+
+def parse_version(version_str):
+    """解析版本号为可比较的元组"""
+    try:
+        nums = re.findall(r'\d+', version_str)
+        parts = [int(n) for n in nums[:3]]
+        while len(parts) < 3:
+            parts.append(0)
+        return tuple(parts)
+    except:
+        return (0, 0, 0)
+
+def is_update_available(current_version, latest_version):
+    """检查是否有新版本"""
+    current = parse_version(current_version)
+    latest = parse_version(latest_version)
+    return latest > current
+
+def get_update_cache_path():
+    """获取更新检查缓存路径"""
+    cache_dir = get_cache_folder()
+    return os.path.join(cache_dir, "update_check.json")
+
+def should_prompt_update(latest_version):
+    """是否需要提示更新"""
+    try:
+        path = get_update_cache_path()
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            last_version = data.get('last_version', '')
+            last_time = float(data.get('last_time', 0))
+            now = time.time()
+            if latest_version == last_version and (now - last_time) < 86400:
+                return False
+        return True
+    except:
+        return True
+
+def save_update_prompt(latest_version):
+    """保存更新提示记录"""
+    try:
+        path = get_update_cache_path()
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump({'last_version': latest_version, 'last_time': time.time()}, f)
+    except:
+        pass
+
+def show_update_notification(latest_version, update_url, release_date=None, release_notes=None):
+    """显示更新提示框"""
+    win = tk.Toplevel()
+    win.title("发现新版本")
+    win.geometry("520x420")
+    win.resizable(False, False)
+    tk.Label(win, text=f"发现新版本 {latest_version}", font=("微软雅黑", 13, "bold")).pack(pady=(12, 4))
+    if release_date:
+        tk.Label(win, text=f"发布日期: {release_date}", font=("微软雅黑", 10), fg="#6B7280").pack()
+    frame = tk.Frame(win)
+    frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+    txt = scrolledtext.ScrolledText(frame, wrap=tk.WORD, height=14)
+    txt.pack(fill=tk.BOTH, expand=True)
+    notes = release_notes or "暂无发布说明"
+    txt.insert(tk.END, notes)
+    txt.config(state=tk.DISABLED)
+    btns = tk.Frame(win)
+    btns.pack(pady=10)
+    def go_update():
+        candidates = []
+        if update_url:
+            candidates.append(update_url)
+        if FASTGIT_RELEASES_URL:
+            candidates.append(FASTGIT_RELEASES_URL)
+        candidates.append(GITHUB_RELEASES_URL)
+        if PROXY_RELEASES_URLS:
+            candidates.extend(PROXY_RELEASES_URLS)
+        for u in candidates:
+            if u:
+                webbrowser.open(u)
+                break
+        save_update_prompt(latest_version)
+        win.destroy()
+    tk.Button(btns, text="前往更新", command=go_update, bg="#2563EB", fg="white", width=12).pack(side=tk.LEFT, padx=8)
+    tk.Button(btns, text="稍后提醒", command=lambda: win.destroy(), bg="#6B7280", fg="white", width=12).pack(side=tk.LEFT, padx=8)
+
+def check_for_updates_in_background(current_version, root):
+    """在后台线程中检查更新，避免阻塞主线程"""
+    def _check():
+        latest_version, update_url, release_date, release_notes = check_for_updates()
+        if latest_version and is_update_available(current_version, latest_version):
+            if should_prompt_update(latest_version):
+                root.after(0, lambda: show_update_notification(latest_version, update_url, release_date, release_notes))
+                save_update_prompt(latest_version)
+        else:
+            print("当前已是最新版本，或检查失败")
+
+    # 使用线程执行检查更新
+    update_thread = threading.Thread(target=_check)
+    update_thread.daemon = True
+    update_thread.start()
+
 
 # ===================== 管理员权限检测 =====================
 if not is_admin():
@@ -65,6 +195,7 @@ class App:
             return
 
         self.page_main_menu()
+        check_for_updates_in_background(LOCAL_VERSION, self.root)
 
     def on_title_click(self, event):
         """检测标题栏点击，用于显示隐藏配置"""
@@ -168,6 +299,14 @@ class App:
         self.create_button(card, "🌐 双WAN配置（路由器）", self.page_dual_wan, color="#7C3AED")
         self.create_button(card, "💻 单机配置（直连）", self.page_standalone_menu, color="#2563EB")
         self.create_button(card, "🛡️ 防护软件", self.page_security_software, color="#2563EB")
+        self.create_button(card, "🔄 检查更新", self.manual_check_update, color="#2563EB")
+
+    def manual_check_update(self):
+        latest_version, update_url, release_date, release_notes = check_for_updates()
+        if latest_version and is_update_available(LOCAL_VERSION, latest_version):
+            show_update_notification(latest_version, update_url, release_date, release_notes)
+        else:
+            messagebox.showinfo("更新检查", "当前已是最新版本或检查失败")
 
     # ---------- 防护软件下载页面 ----------
     def page_security_software(self):
@@ -281,6 +420,13 @@ class App:
         cts_status = tk.Label(cts_frame, text="检测中...", bg="white", fg="#F59E0B", font=("微软雅黑", 10))
         cts_status.pack(side=tk.LEFT, padx=10)
 
+        # 检测项5：防护软件
+        agent_frame = tk.Frame(result_frame, bg="white")
+        agent_frame.pack(fill=tk.X, pady=10)
+        tk.Label(agent_frame, text="防护软件 (IsAgent):", width=30, bg="white", font=("微软雅黑", 10, "bold"), anchor="w").pack(side=tk.LEFT)
+        agent_status = tk.Label(agent_frame, text="检测中...", bg="white", fg="#F59E0B", font=("微软雅黑", 10))
+        agent_status.pack(side=tk.LEFT, padx=10)
+
         # 详细信息显示区域
         detail_frame = tk.LabelFrame(card, text="详细信息", font=("微软雅黑", 10, "bold"), bg="white", padx=10, pady=10)
         detail_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -295,6 +441,12 @@ class App:
         refresh_btn = tk.Button(btn_frame, text="🔄 重新检测", command=self.page_medical_network_check,
                                bg="#2563EB", fg="white", font=("微软雅黑", 10, "bold"), width=15, height=2)
         refresh_btn.pack(side=tk.LEFT, padx=10)
+        
+        # 防护软件快捷按钮（默认隐藏，检测后根据状态显示）
+        self.agent_download_btn = tk.Button(btn_frame, text="⬇️ 下载防护软件", command=self.page_security_software,
+                                           bg="#DC2626", fg="white", font=("微软雅黑", 10, "bold"), width=15, height=2)
+        self.agent_download_btn.pack(side=tk.LEFT, padx=10)
+        self.agent_download_btn.pack_forget()  # 初始隐藏
 
         # 异步执行检测
         def run_checks():
@@ -341,13 +493,30 @@ class App:
                 cts_status.config(text="✗ 无法访问", fg="#EF4444")
                 detail_text.insert(tk.END, "结果: ✗ 无法访问\n\n")
             
+            # 5. 防护软件检测
+            agent_path = r"C:\Windows\SysWOW64\IsAgent"
+            agent_exists = os.path.exists(agent_path)
+            detail_text.insert(tk.END, "【检测5】防护软件 IsAgent\n")
+            if agent_exists:
+                agent_status.config(text="✓ 已安装", fg="#16A34A")
+                detail_text.insert(tk.END, f"结果: ✓ 已安装 ({agent_path})\n\n")
+                # 隐藏下载按钮
+                root.after(0, lambda: self.agent_download_btn.pack_forget())
+            else:
+                agent_status.config(text="✗ 未安装", fg="#EF4444")
+                detail_text.insert(tk.END, f"结果: ✗ 未安装 ({agent_path})\n\n")
+                # 显示下载按钮
+                root.after(0, lambda: self.agent_download_btn.pack(side=tk.LEFT, padx=10))
+            
             # 总结
             detail_text.insert(tk.END, "=" * 60 + "\n")
-            all_ok = ping_success and hisips_ok and fms_ok and cts_ok
+            all_ok = ping_success and hisips_ok and fms_ok and cts_ok and agent_exists
             if all_ok:
                 detail_text.insert(tk.END, "✓ 所有检测项通过，医保网络正常！\n")
             else:
                 detail_text.insert(tk.END, "⚠ 部分检测项未通过，请检查网络配置\n")
+                if not agent_exists:
+                    detail_text.insert(tk.END, "建议：请下载安装防护软件以确保医保网络正常访问！\n")
             
             detail_text.see(tk.END)
         

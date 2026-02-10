@@ -56,3 +56,21 @@ SUNFLOWER_DOWNLOAD_URL = "https://down.oray.com/sunlogin/windows/SunloginClient_
 WINDOW_TITLE = "医保网络配置工具"
 WINDOW_SIZE = "800x600"
 WINDOW_BG_COLOR = "#F5F7FA"
+
+# ===================== 版本更新配置 =====================
+# 程序版本
+LOCAL_VERSION = "1.0.30"
+
+# GitHub 原始地址
+GITHUB_RELEASES_URL = "https://github.com/tangjin2580/NetConf/releases"
+GITHUB_API_URL = "https://api.github.com/repos/tangjin2580/NetConf/releases/latest"
+
+# 加速下载地址（国内用户使用）
+# 使用 FastGit 镜像加速
+FASTGIT_RELEASES_URL = "https://download.fastgit.org/tangjin2580/NetConf/releases"
+
+# 也可以使用其他代理，根据需要添加
+PROXY_RELEASES_URLS = [
+    "https://ghproxy.net/https://github.com/tangjin2580/NetConf/releases",
+    "https://pd.zwc365.com/api/worker/githubproxy?url=https://github.com/tangjin2580/NetConf/releases",
+]
