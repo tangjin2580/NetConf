@@ -167,13 +167,13 @@ class App:
         self.create_button(card, "🔍 医保网络检测", self.page_medical_network_check, color="#16A34A")
         self.create_button(card, "🌐 双WAN配置（路由器）", self.page_dual_wan, color="#7C3AED")
         self.create_button(card, "💻 单机配置（直连）", self.page_standalone_menu, color="#2563EB")
-        self.create_button(card, "🛡️ 防护软件", self.page_security_software, color="#DC2626")
+        self.create_button(card, "🛡️ 防护软件", self.page_security_software, color="#2563EB")
 
     # ---------- 防护软件下载页面 ----------
     def page_security_software(self):
         """防护软件介绍和下载页面"""
         self.clear()
-        tk.Label(self.root, text="防护软件", font=self.font_title, bg="#DC2626", fg="white", pady=14).pack(fill=tk.X)
+        tk.Label(self.root, text="防护软件", font=self.font_title, bg="#2563EB", fg="white", pady=14).pack(fill=tk.X)
 
         card = tk.Frame(self.root, bg="white")
         card.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
@@ -747,13 +747,25 @@ class App:
             else:
                 run_in_thread(do_hosts, on_done)
 
+        def open_hosts_file():
+            """打开hosts文件位置"""
+            hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
+            try:
+                # 选择在资源管理器中打开
+                subprocess.Popen(f'explorer /select,"{hosts_path}"')
+                messagebox.showinfo("提示", f"已打开hosts文件位置:\n{hosts_path}")
+            except Exception as e:
+                messagebox.showerror("错误", f"无法打开hosts文件: {str(e)}\n\n请手动访问:\n{hosts_path}")
+
         btn_frame = tk.Frame(card, bg="white")
         btn_frame.pack(pady=20)
         
+        tk.Button(btn_frame, text="📂 打开文件位置", command=open_hosts_file,
+                 bg="#7C3AED", fg="white", font=("微软雅黑", 10, "bold"), width=15, height=2).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="检查并补全", command=check_and_done,
-                 bg="#16A34A", fg="white", font=("微软雅黑", 11, "bold"), width=15, height=2).pack(side=tk.LEFT, padx=10)
+                 bg="#16A34A", fg="white", font=("微软雅黑", 11, "bold"), width=15, height=2).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="返回", command=self.page_standalone_menu,
-                 bg="#6B7280", fg="white", font=("微软雅黑", 10), width=12, height=2).pack(side=tk.LEFT, padx=10)
+                 bg="#6B7280", fg="white", font=("微软雅黑", 10), width=12, height=2).pack(side=tk.LEFT, padx=5)
 
     # ---------- 网卡选择页面 ----------
     def page_select(self):
