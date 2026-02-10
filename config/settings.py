@@ -59,7 +59,7 @@ WINDOW_BG_COLOR = "#F5F7FA"
 
 # ===================== 版本更新配置 =====================
 # 程序版本
-LOCAL_VERSION = "1.0.32"
+LOCAL_VERSION = "1.0.33"
 
 # GitHub 原始地址
 GITHUB_RELEASES_URL = "https://github.com/tangjin2580/NetConf/releases"

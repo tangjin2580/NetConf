@@ -285,6 +285,25 @@ class App:
         btn = tk.Button(parent, text=text, font=self.font_btn, bg=color, fg="white", width=22, height=2, command=command)
         btn.grid(row=row, column=column, padx=12, pady=12, sticky="ew")
 
+    def create_scrollable(self, parent):
+        container = tk.Frame(parent, bg="white")
+        container.pack(fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(container, bg="white", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        inner = tk.Frame(canvas, bg="white")
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        def on_config(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        inner.bind("<Configure>", on_config)
+        def on_mousewheel(event):
+            delta = 1 if event.delta > 0 else -1
+            canvas.yview_scroll(-delta, "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        return inner
+
     # 创建标签组件
     def create_label(self, parent, text, font=("微软雅黑", 10, "bold"), pady=10):
         tk.Label(parent, text=text, font=font, bg="white").pack(anchor="w", padx=15, pady=pady)
@@ -309,11 +328,31 @@ class App:
         self.create_button_grid(buttons, "🛡️ 防护软件", self.page_security_software, 2, 0, color="#2563EB")
 
     def manual_check_update(self):
-        latest_version, update_url, release_date, release_notes = check_for_updates()
-        if latest_version and is_update_available(LOCAL_VERSION, latest_version):
-            show_update_notification(latest_version, update_url, release_date, release_notes)
-        else:
-            messagebox.showinfo("更新检查", "当前已是最新版本或检查失败")
+        win = tk.Toplevel(self.root)
+        win.title("检查更新中")
+        win.geometry("360x120")
+        win.resizable(False, False)
+        tk.Label(win, text="正在检查更新，请稍候...", font=("微软雅黑", 10)).pack(pady=(15, 8))
+        pb = ttk.Progressbar(win, mode="indeterminate", length=300)
+        pb.pack(pady=8, padx=20)
+        pb.start(10)
+        def on_done(result):
+            try:
+                latest_version, update_url, release_date, release_notes = result
+                if latest_version and is_update_available(LOCAL_VERSION, latest_version):
+                    show_update_notification(latest_version, update_url, release_date, release_notes)
+                else:
+                    messagebox.showinfo("更新检查", "当前已是最新版本或检查失败")
+            finally:
+                pb.stop()
+                win.destroy()
+        def on_error(e):
+            try:
+                messagebox.showerror("错误", f"检查更新失败: {e}")
+            finally:
+                pb.stop()
+                win.destroy()
+        run_in_thread(check_for_updates, on_done=on_done, on_error=on_error)
 
     # ---------- 防护软件下载页面 ----------
     def page_security_software(self):
@@ -385,18 +424,19 @@ class App:
 
         card = tk.Frame(self.root, bg="white")
         card.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
+        content = self.create_scrollable(card)
 
         # 返回按钮
-        top_btn_frame = tk.Frame(card, bg="white")
+        top_btn_frame = tk.Frame(content, bg="white")
         top_btn_frame.pack(fill=tk.X, pady=(0, 15))
         tk.Button(top_btn_frame, text="← 返回", command=self.page_main_menu,
                  bg="#6B7280", fg="white", font=("微软雅黑", 10), width=10).pack(side=tk.LEFT)
 
         # 检测结果标题
-        tk.Label(card, text="正在检测医保网络连通性...", font=("微软雅黑", 12, "bold"), bg="white").pack(pady=(10, 20))
+        tk.Label(content, text="正在检测医保网络连通性...", font=("微软雅黑", 12, "bold"), bg="white").pack(pady=(10, 20))
 
         # 创建结果展示区域
-        result_frame = tk.LabelFrame(card, text="检测结果", font=("微软雅黑", 11, "bold"), bg="white", padx=15, pady=15)
+        result_frame = tk.LabelFrame(content, text="检测结果", font=("微软雅黑", 11, "bold"), bg="white", padx=15, pady=15)
         result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # 检测项1：ping 10.35.128.1
@@ -435,14 +475,14 @@ class App:
         agent_status.pack(side=tk.LEFT, padx=10)
 
         # 详细信息显示区域
-        detail_frame = tk.LabelFrame(card, text="详细信息", font=("微软雅黑", 10, "bold"), bg="white", padx=10, pady=10)
+        detail_frame = tk.LabelFrame(content, text="详细信息", font=("微软雅黑", 10, "bold"), bg="white", padx=10, pady=10)
         detail_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         detail_text = scrolledtext.ScrolledText(detail_frame, wrap=tk.WORD, font=("微软雅黑", 9), height=8)
         detail_text.pack(fill=tk.BOTH, expand=True)
 
         # 按钮区域
-        btn_frame = tk.Frame(card, bg="white")
+        btn_frame = tk.Frame(content, bg="white")
         btn_frame.pack(pady=15)
         
         refresh_btn = tk.Button(btn_frame, text="🔄 重新检测", command=self.page_medical_network_check,
