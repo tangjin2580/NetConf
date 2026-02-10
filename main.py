@@ -281,6 +281,10 @@ class App:
     def create_button(self, parent, text, command, width=24, height=2, color="#2563EB"):
         tk.Button(parent, text=text, font=self.font_btn, bg=color, fg="white", width=width, height=height, command=command).pack(pady=15)
 
+    def create_button_grid(self, parent, text, command, row, column, color="#2563EB"):
+        btn = tk.Button(parent, text=text, font=self.font_btn, bg=color, fg="white", width=22, height=2, command=command)
+        btn.grid(row=row, column=column, padx=12, pady=12, sticky="ew")
+
     # 创建标签组件
     def create_label(self, parent, text, font=("微软雅黑", 10, "bold"), pady=10):
         tk.Label(parent, text=text, font=font, bg="white").pack(anchor="w", padx=15, pady=pady)
@@ -293,13 +297,16 @@ class App:
         card = tk.Frame(self.root, bg="white")
         card.pack(padx=40, pady=40, fill=tk.BOTH, expand=True)
 
-        tk.Label(card, text="请选择配置模式", font=("微软雅黑", 13, "bold"), bg="white").pack(pady=30)
-
-        self.create_button(card, "🔍 医保网络检测", self.page_medical_network_check, color="#16A34A")
-        self.create_button(card, "🌐 双WAN配置（路由器）", self.page_dual_wan, color="#7C3AED")
-        self.create_button(card, "💻 单机配置（直连）", self.page_standalone_menu, color="#2563EB")
-        self.create_button(card, "🛡️ 防护软件", self.page_security_software, color="#2563EB")
-        self.create_button(card, "🔄 检查更新", self.manual_check_update, color="#2563EB")
+        tk.Label(card, text="请选择配置模式", font=("微软雅黑", 13, "bold"), bg="white").pack(pady=(20, 10))
+        buttons = tk.Frame(card, bg="white")
+        buttons.pack(fill=tk.X, padx=10, pady=10)
+        buttons.grid_columnconfigure(0, weight=1)
+        buttons.grid_columnconfigure(1, weight=1)
+        self.create_button_grid(buttons, "🔍 医保网络检测", self.page_medical_network_check, 0, 0, color="#16A34A")
+        self.create_button_grid(buttons, "🔄 检查更新", self.manual_check_update, 0, 1, color="#2563EB")
+        self.create_button_grid(buttons, "🌐 双WAN配置（路由器）", self.page_dual_wan, 1, 0, color="#7C3AED")
+        self.create_button_grid(buttons, "💻 单机配置（直连）", self.page_standalone_menu, 1, 1, color="#2563EB")
+        self.create_button_grid(buttons, "🛡️ 防护软件", self.page_security_software, 2, 0, color="#2563EB")
 
     def manual_check_update(self):
         latest_version, update_url, release_date, release_notes = check_for_updates()
