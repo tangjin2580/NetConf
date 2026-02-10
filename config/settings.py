@@ -20,7 +20,7 @@ MEDICAL_HOSTS = [
     "hisips.shx.hsip.gov.cn",
     "fms.shx.hsip.gov.cn",
     "cts-svc.shx.hsip.gov.cn",
-    "10.37.227.210 zfzg.shx.hsip.gov.cn"
+    "zfzg.shx.hsip.gov.cn"
 ]
 
 # ===================== 默认网络配置 =====================
@@ -50,6 +50,7 @@ SUNFLOWER_PATHS = [
 ]
 
 SUNFLOWER_DOWNLOAD_URL = "https://down.oray.com/sunlogin/windows/SunloginClient_ng.exe"
+
 
 # ===================== GUI配置 =====================
 WINDOW_TITLE = "医保网络配置工具"

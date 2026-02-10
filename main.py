@@ -167,6 +167,70 @@ class App:
         self.create_button(card, "🔍 医保网络检测", self.page_medical_network_check, color="#16A34A")
         self.create_button(card, "🌐 双WAN配置（路由器）", self.page_dual_wan, color="#7C3AED")
         self.create_button(card, "💻 单机配置（直连）", self.page_standalone_menu, color="#2563EB")
+        self.create_button(card, "🛡️ 防护软件", self.page_security_software, color="#DC2626")
+
+    # ---------- 防护软件下载页面 ----------
+    def page_security_software(self):
+        """防护软件介绍和下载页面"""
+        self.clear()
+        tk.Label(self.root, text="防护软件", font=self.font_title, bg="#DC2626", fg="white", pady=14).pack(fill=tk.X)
+
+        card = tk.Frame(self.root, bg="white")
+        card.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
+
+        # 返回按钮
+        top_btn_frame = tk.Frame(card, bg="white")
+        top_btn_frame.pack(fill=tk.X, pady=(0, 15))
+        tk.Button(top_btn_frame, text="← 返回", command=self.page_main_menu,
+                 bg="#6B7280", fg="white", font=("微软雅黑", 10), width=10).pack(side=tk.LEFT)
+
+        # 防护软件介绍
+        tk.Label(card, text="医保安全防护软件", font=("微软雅黑", 14, "bold"), bg="white").pack(pady=(10, 5))
+        tk.Label(card, text="保护您的医保系统安全", font=("微软雅黑", 11), bg="white", fg="#6B7280").pack(pady=(0, 20))
+
+        # 介绍说明
+        info_frame = tk.LabelFrame(card, text="软件说明", font=("微软雅黑", 10, "bold"), bg="white", padx=15, pady=10)
+        info_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        tk.Label(info_frame, text="• 保护医保系统网络安全\n• 防止恶意程序入侵\n• 确保数据传输安全", 
+                bg="white", font=("微软雅黑", 10), justify=tk.LEFT, anchor="w").pack(anchor="w", pady=5)
+
+        # 下载按钮区域
+        download_frame = tk.LabelFrame(card, text="请选择您的网络类型下载", font=("微软雅黑", 11, "bold"), bg="white", padx=20, pady=15)
+        download_frame.pack(fill=tk.X, padx=10, pady=20)
+
+        def download_telecom():
+            """下载电信专线版本"""
+            telecom_url = "http://photo.cxsdwan.com:40072/pd/1/%E5%8C%BB%E4%BF%9D/10.36.82.162_443_https_0_IsSetup_Agent.exe?signature=41321d19590fea73ce80c53793e0c51173abe9084fc7b23cf13478b572c1dc6f722b065f18caf848cb8f71f7d8eadc145b44fcc3b2193aae34a4278bb9cd326e7832fc5ac31924060183a574f29baa85"
+            webbrowser.open(telecom_url)
+            messagebox.showinfo("下载提示", "正在打开电信专线下载页面...\n如果下载未开始，请检查您的网络连接")
+
+        def download_unicom():
+            """下载联通专线版本"""
+            unicom_url = "http://file.cxsdwan.com:40072/s/865s98"
+            webbrowser.open(unicom_url)
+            messagebox.showinfo("下载提示", "正在打开联通专线下载页面...\n如果下载未开始，请检查您的网络连接")
+
+        # 电信下载按钮
+        telecom_frame = tk.Frame(download_frame, bg="white")
+        telecom_frame.pack(fill=tk.X, pady=10)
+        tk.Label(telecom_frame, text="电信专线用户", bg="white", font=("微软雅黑", 11), width=15, anchor="w").pack(side=tk.LEFT)
+        tk.Button(telecom_frame, text="⬇️ 点击下载", command=download_telecom,
+                 bg="#2563EB", fg="white", font=("微软雅黑", 10, "bold"), width=15, height=1).pack(side=tk.LEFT, padx=10)
+
+        # 联通下载按钮
+        unicom_frame = tk.Frame(download_frame, bg="white")
+        unicom_frame.pack(fill=tk.X, pady=10)
+        tk.Label(unicom_frame, text="联通专线用户", bg="white", font=("微软雅黑", 11), width=15, anchor="w").pack(side=tk.LEFT)
+        tk.Button(unicom_frame, text="⬇️ 点击下载", command=download_unicom,
+                 bg="#16A34A", fg="white", font=("微软雅黑", 10, "bold"), width=15, height=1).pack(side=tk.LEFT, padx=10)
+
+        # 注意事项
+        note_frame = tk.LabelFrame(card, text="注意事项", font=("微软雅黑", 10, "bold"), bg="white", padx=15, pady=10)
+        note_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        tk.Label(note_frame, text="• 下载后请运行安装程序并按提示完成安装\n• 安装过程可能需要管理员权限\n• 如遇到问题，请联系技术支持", 
+                bg="white", font=("微软雅黑", 9), fg="#6B7280", justify=tk.LEFT, anchor="w").pack(anchor="w", pady=5)
 
     # ---------- 医保网络检测页面 ----------
     def page_medical_network_check(self):
