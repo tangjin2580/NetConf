@@ -113,6 +113,7 @@ jobs:
           - 系统更新检测
           - 防护软件检测
           - host文件打开功能
+          - 去除管理员限制
         draft: false
         prerelease: false
 

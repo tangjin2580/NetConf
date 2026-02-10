@@ -146,13 +146,6 @@ def check_for_updates_in_background(current_version, root):
     update_thread.start()
 
 
-# ===================== 管理员权限检测 =====================
-if not is_admin():
-    root = tk.Tk()
-    root.withdraw()
-    messagebox.showerror("权限不足", "请右键以【管理员身份】运行本程序")
-    sys.exit(1)
-
 # ===================== 线程工具 =====================
 def run_in_thread(func, on_done=None, on_error=None):
     def wrapper():
@@ -195,6 +188,8 @@ class App:
             return
 
         self.page_main_menu()
+        if not is_admin():
+            tk.Label(self.root, text="当前未以管理员运行，部分系统配置不可用", bg="#FEF3C7", fg="#92400E", font=("微软雅黑", 9)).pack(fill=tk.X)
         check_for_updates_in_background(LOCAL_VERSION, self.root)
 
     def on_title_click(self, event):
@@ -386,7 +381,7 @@ class App:
 
         def download_telecom():
             """下载电信专线版本"""
-            telecom_url = "http://photo.cxsdwan.com:40072/pd/1/%E5%8C%BB%E4%BF%9D/10.36.82.162_443_https_0_IsSetup_Agent.exe?signature=41321d19590fea73ce80c53793e0c51173abe9084fc7b23cf13478b572c1dc6f722b065f18caf848cb8f71f7d8eadc145b44fcc3b2193aae34a4278bb9cd326e7832fc5ac31924060183a574f29baa85"
+            telecom_url = "http://photo.cxsdwan.com:40072/share/73591412"
             webbrowser.open(telecom_url)
             messagebox.showinfo("下载提示", "正在打开电信专线下载页面...\n如果下载未开始，请检查您的网络连接")
 
@@ -705,6 +700,9 @@ class App:
 
     def set_all_mtu(self):
         """一键设置所有网卡MTU=1300"""
+        if not is_admin():
+            messagebox.showerror("权限不足", "请以管理员身份运行后再执行此操作")
+            return
         def task():
             results = set_all_mtu(1300)
             return results
@@ -1055,6 +1053,9 @@ class App:
         self._apply_async(force=True)
 
     def _apply_async(self, force=False):
+        if not is_admin():
+            messagebox.showerror("权限不足", "请以管理员身份运行后再执行系统配置")
+            return
         ip = self.ip.get().strip()
         mask = self.mask.get().strip()
         dns = self.dns.get().strip()
