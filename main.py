@@ -6,8 +6,15 @@ import webbrowser
 import os
 import threading
 from datetime import datetime
-from PIL import Image, ImageTk
-import requests
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = None
+    ImageTk = None
+try:
+    import requests
+except Exception:
+    requests = None
 import re
 import json
 import time
@@ -18,11 +25,33 @@ from core.network import *
 from core.hosts import *
 from core.system import *
 from utils.cache import *
-from utils.server import *
+# 可选加载服务器模块，避免依赖缺失导致界面无法启动
+SERVER_AVAILABLE = True
+try:
+    from utils.server import *
+except Exception:
+    SERVER_AVAILABLE = False
+    def check_server_status(server_url):
+        return False, None
+    def fetch_server_files(server_url):
+        return []
+    def download_file_to_cache(server_url, filename):
+        return None
+    def fetch_file_content(server_url, filename):
+        return None
 
 # ===================== 版本检查工具 =====================
 import os
 from config.settings import LOCAL_VERSION, GITHUB_API_URL, GITHUB_RELEASES_URL, FASTGIT_RELEASES_URL, PROXY_RELEASES_URLS
+
+def log_error(message):
+    try:
+        cache_dir = get_cache_folder()
+        path = os.path.join(cache_dir, "startup.log")
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
+    except:
+        pass
 
 def check_for_updates():
     """检查是否有新版本可用"""
@@ -34,6 +63,8 @@ def check_for_updates():
             return None, None, None, None
 
         # 请求 GitHub 获取最新版本
+        if not requests:
+            return None, None, None, None
         response = requests.get(GITHUB_API_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
@@ -163,7 +194,14 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("医保网络配置工具")
-        self.root.geometry("800x600")
+        try:
+            sw = self.root.winfo_screenwidth()
+            sh = self.root.winfo_screenheight()
+            x = (sw - 800) // 2
+            y = (sh - 600) // 2
+            self.root.geometry(f"800x600+{x}+{y}")
+        except:
+            self.root.geometry("800x600")
         self.root.resizable(False, False)
         self.root.configure(bg="#F5F7FA")
 
@@ -323,6 +361,9 @@ class App:
         self.create_button_grid(buttons, "🛡️ 防护软件", self.page_security_software, 2, 0, color="#2563EB")
 
     def manual_check_update(self):
+        if not requests:
+            messagebox.showwarning("提示", "网络模块未安装，无法检查更新")
+            return
         win = tk.Toplevel(self.root)
         win.title("检查更新中")
         win.geometry("360x120")
@@ -723,7 +764,7 @@ class App:
     def page_info_display(self):
         """从服务器下载并展示配置信息（自动下载到本地）"""
         # 检查服务器状态
-        is_connected, status_data = check_server_status(self.server_url_value)
+        is_connected, status_data = check_server_status(self.server_url_value) if SERVER_AVAILABLE else (False, None)
         
         # 安全检查：如果server_status存在才更新
         if hasattr(self, 'server_status') and self.server_status:
@@ -756,7 +797,7 @@ class App:
         clear_cache()
         
         # 从服务器获取文件列表
-        files = fetch_server_files(self.server_url_value)
+        files = fetch_server_files(self.server_url_value) if SERVER_AVAILABLE else []
         
         if not files:
             # 无文件
@@ -780,7 +821,7 @@ class App:
             self.info_notebook.add(frame, text=filename[:10] + "..." if len(filename) > 10 else filename)
             
             # 下载文件到本地
-            local_path = download_file_to_cache(self.server_url_value, filename)
+            local_path = download_file_to_cache(self.server_url_value, filename) if SERVER_AVAILABLE else None
             
             if file_ext in ['.txt', '.md', '.py', '.json', '.xml', '.html', '.css', '.js', '.log']:
                 # 文本文件 - 在GUI中直接显示
@@ -791,7 +832,7 @@ class App:
                     except:
                         content = "无法读取文件内容"
                 else:
-                    content = fetch_file_content(self.server_url_value, filename) or "下载失败"
+                    content = (fetch_file_content(self.server_url_value, filename) if SERVER_AVAILABLE else None) or "下载失败"
                 
                 # 显示文本
                 text_widget = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=("微软雅黑", 10))
@@ -801,7 +842,7 @@ class App:
                 
             elif file_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp']:
                 # 图片文件 - 在GUI中显示
-                if local_path and os.path.exists(local_path):
+                if local_path and os.path.exists(local_path) and Image is not None:
                     try:
                         # 加载图片
                         img = Image.open(local_path)
@@ -825,7 +866,7 @@ class App:
                     except Exception as e:
                         tk.Label(frame, text=f"无法加载图片: {str(e)}", bg="white", fg="#EF4444").pack(pady=30)
                 else:
-                    tk.Label(frame, text="图片下载失败", bg="white", fg="#EF4444").pack(pady=30)
+                    tk.Label(frame, text="图片加载失败或图像库未安装", bg="white", fg="#EF4444").pack(pady=30)
             else:
                 # 其他文件 - 显示文件信息
                 file_size = file_info.get('size', 0)
@@ -1169,5 +1210,18 @@ class App:
 # ===================== 启动 =====================
 if __name__ == "__main__":
     root = tk.Tk()
-    App(root)
-    root.mainloop()
+    try:
+        App(root)
+        root.mainloop()
+    except Exception as e:
+        try:
+            log_error(f"启动失败: {str(e)}")
+        except:
+            pass
+        try:
+            messagebox.showerror("启动失败", f"程序无法启动，请联系技术支持。\n错误信息已记录。")
+        finally:
+            try:
+                root.destroy()
+            except:
+                pass
