@@ -129,24 +129,24 @@ jobs:
         
         # 创建运行库安装脚本
         $batContent = @"
-@echo off
-chcp 65001 > nul
-echo ========================================
-echo   正在检查运行库...
-echo ========================================
-echo.
-echo Windows 7 用户请确保已安装 KB2533623 更新
-echo 下载: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
-echo.
-echo 正在下载 Visual C++ 运行库...
-echo.
-powershell -Command "Start-Process -FilePath 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -Verb Open"
-powershell -Command "Start-Process -FilePath 'https://aka.ms/vs/17/release/vc_redist.x86.exe' -Verb Open"
-echo.
-echo 请在新窗口中安装运行库，然后运行主程序
-echo.
-pause
-"@
+        @echo off
+        chcp 65001 > nul
+        echo ========================================
+        echo   正在检查运行库...
+        ========================================
+        echo.
+        echo Windows 7 用户请确保已安装 KB2533623 更新
+        echo 下载: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
+        echo.
+        echo 正在下载 Visual C++ 运行库...
+        echo.
+         -Command "Start-Process -FilePath 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -Verb Open"
+        powershell -Command "Start-Process -FilePath 'https://aka.ms/vs/17/release/vc_redist.x86.exe' -Verb Open"
+        echo.
+        echo 请在新窗口中安装运行库，然后运行主程序
+        echo.
+        pause
+        "@
         $batContent | Out-File -FilePath "dist/Win7/安装运行库.bat" -Encoding UTF8
 
     - name: Upload Win7 artifact
