@@ -65,7 +65,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --windowed --name="医保网络配置工具-Win7" main.py
+          pyinstaller --onefile --windowed --icon="icon.ico" --name="医保网络配置工具-Win7" main.py
 
       - name: Create Win7 package
         run: |
@@ -111,7 +111,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --windowed --name="医保网络配置工具-Win10" main.py
+          pyinstaller --onefile --windowed --icon="icon.ico" --name="医保网络配置工具-Win10" main.py
 
       - name: Create Win10 package
         run: |
