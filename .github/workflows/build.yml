@@ -45,6 +45,9 @@ jobs:
   build-win7:
     runs-on: windows-latest
     needs: get-version
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -67,13 +70,15 @@ jobs:
       - name: Create Win7 package
         run: |
           mkdir -p dist/Win7
-          cp dist/*.exe dist/Win7/ 2>/dev/null || cp dist/医保网络配置工具-Win7.exe dist/Win7/
-          echo @echo off > dist/Win7/安装运行库.bat
-          echo chcp 65001 ^> nul >> dist/Win7/安装运行库.bat
-          echo echo 正在打开运行库下载页面... >> dist/Win7/安装运行库.bat
-          echo start https://aka.ms/vs/17/release/vc_redist.x64.exe >> dist/Win7/安装运行库.bat
-          echo start https://aka.ms/vs/17/release/vc_redist.x86.exe >> dist/Win7/安装运行库.bat
-          echo pause >> dist/Win7/安装运行库.bat
+          cp dist/*.exe dist/Win7/ 2>/dev/null || cp "dist/医保网络配置工具-Win7.exe" dist/Win7/
+          cat > dist/Win7/安装运行库.bat << 'EOF'
+          @echo off
+          chcp 65001 > nul
+          echo 正在打开运行库下载页面...
+          start https://aka.ms/vs/17/release/vc_redist.x64.exe
+          start https://aka.ms/vs/17/release/vc_redist.x86.exe
+          pause
+          EOF
 
       - name: Upload Win7 artifact
         uses: actions/upload-artifact@v4
@@ -86,6 +91,9 @@ jobs:
   build-win10:
     runs-on: windows-latest
     needs: get-version
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -108,7 +116,7 @@ jobs:
       - name: Create Win10 package
         run: |
           mkdir -p dist/Win10
-          cp dist/*.exe dist/Win10/ 2>/dev/null || cp dist/医保网络配置工具-Win10.exe dist/Win10/
+          cp dist/*.exe dist/Win10/ 2>/dev/null || cp "dist/医保网络配置工具-Win10.exe" dist/Win10/
 
       - name: Upload Win10 artifact
         uses: actions/upload-artifact@v4
