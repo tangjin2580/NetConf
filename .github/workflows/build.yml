@@ -15,7 +15,7 @@ permissions:
 # 完整的打包工作流
 jobs:
   # ========================================
-  # 步骤1: 获取版本号 (并行执行)
+  # 步骤1: 获取版本号
   # ========================================
   get-version:
     runs-on: ubuntu-latest
@@ -95,7 +95,6 @@ jobs:
               --hidden-import=idna `
               --hidden-import=urllib3 `
               --hidden-import=certifi `
-              --hidden-import=openssl `
               --collect-all=PIL `
               --collect-all=requests `
               --add-data "config;config" `
@@ -105,48 +104,49 @@ jobs:
         }
 
     - name: Create Win7 package
+      shell: pwsh
       run: |
         # 创建输出目录
         New-Item -ItemType Directory -Path "dist/Win7" -Force | Out-Null
         
-        # 查找并复制exe文件
-        $exeFiles = Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse
-        foreach ($exe in $exeFiles) {
-            if ($exe.Name -like "*Win7*") {
-                Copy-Item $exe.FullName "dist/Win7/"
-                Write-Host "Copied: $($exe.Name)"
+        # 查找所有exe文件（递归搜索）
+        Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | ForEach-Object {
+            $destPath = "dist/Win7/$($_.Name)"
+            if (!(Test-Path $destPath)) {
+                Copy-Item $_.FullName "dist/Win7/"
+                Write-Host "Copied: $($_.FullName) -> dist/Win7/$($_.Name)"
             }
         }
         
-        # 如果没有特定命名的，使用第一个找到的
-        if ((Get-ChildItem "dist/Win7" -Filter "*.exe").Count -eq 0) {
-            $firstExe = Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | Select-Object -First 1
-            if ($firstExe) {
-                Copy-Item $firstExe.FullName "dist/Win7/医保网络配置工具-Win7.exe"
-                Write-Host "Copied as: 医保网络配置工具-Win7.exe"
-            }
+        # 确保至少有一个exe文件
+        $exeCount = (Get-ChildItem "dist/Win7" -Filter "*.exe").Count
+        if ($exeCount -eq 0) {
+            Write-Host "Warning: No exe found, checking dist structure..."
+            Get-ChildItem -Path "dist" -Recurse -Filter "*.exe" | Format-Table FullName
+        } else {
+            Write-Host "Found $exeCount exe files in dist/Win7"
         }
         
         # 创建运行库安装脚本
         $batContent = @"
-        @echo off
-        chcp 65001 > nul
-        echo ========================================
-        echo   正在检查运行库...
-        ========================================
-        echo.
-        echo Windows 7 用户请确保已安装 KB2533623 更新
-        echo 下载: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
-        echo.
-        echo 正在下载 Visual C++ 运行库...
-        echo.
-         -Command "Start-Process -FilePath 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -Verb Open"
-        powershell -Command "Start-Process -FilePath 'https://aka.ms/vs/17/release/vc_redist.x86.exe' -Verb Open"
-        echo.
-        echo 请在新窗口中安装运行库，然后运行主程序
-        echo.
-        pause
-        "@
+@echo off
+chcp 65001 > nul
+echo ========================================
+echo   正在检查运行库...
+echo ========================================
+echo.
+echo Windows 7 用户请确保已安装 KB2533623 更新
+echo 下载: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
+echo.
+echo 正在打开运行库下载页面...
+echo.
+powershell -Command "Start-Process 'https://aka.ms/vs/17/release/vc_redist.x64.exe'"
+powershell -Command "Start-Process 'https://aka.ms/vs/17/release/vc_redist.x86.exe'"
+echo.
+echo 请在新窗口中安装运行库，然后运行主程序
+echo.
+pause
+"@
         $batContent | Out-File -FilePath "dist/Win7/安装运行库.bat" -Encoding UTF8
 
     - name: Upload Win7 artifact
@@ -201,7 +201,6 @@ jobs:
               --hidden-import=idna `
               --hidden-import=urllib3 `
               --hidden-import=certifi `
-              --hidden-import=openssl `
               --collect-all=PIL `
               --collect-all=requests `
               --add-data "config;config" `
@@ -211,26 +210,27 @@ jobs:
         }
 
     - name: Create Win10 package
+      shell: pwsh
       run: |
         # 创建输出目录
         New-Item -ItemType Directory -Path "dist/Win10" -Force | Out-Null
         
-        # 查找并复制exe文件
-        $exeFiles = Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse
-        foreach ($exe in $exeFiles) {
-            if ($exe.Name -like "*Win10*") {
-                Copy-Item $exe.FullName "dist/Win10/"
-                Write-Host "Copied: $($exe.Name)"
+        # 查找所有exe文件（递归搜索）
+        Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | ForEach-Object {
+            $destPath = "dist/Win10/$($_.Name)"
+            if (!(Test-Path $destPath)) {
+                Copy-Item $_.FullName "dist/Win10/"
+                Write-Host "Copied: $($_.FullName) -> dist/Win10/$($_.Name)"
             }
         }
         
-        # 如果没有特定命名的，使用第一个找到的
-        if ((Get-ChildItem "dist/Win10" -Filter "*.exe").Count -eq 0) {
-            $firstExe = Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | Select-Object -First 1
-            if ($firstExe) {
-                Copy-Item $firstExe.FullName "dist/Win10/医保网络配置工具-Win10.exe"
-                Write-Host "Copied as: 医保网络配置工具-Win10.exe"
-            }
+        # 确保至少有一个exe文件
+        $exeCount = (Get-ChildItem "dist/Win10" -Filter "*.exe").Count
+        if ($exeCount -eq 0) {
+            Write-Host "Warning: No exe found, checking dist structure..."
+            Get-ChildItem -Path "dist" -Recurse -Filter "*.exe" | Format-Table FullName
+        } else {
+            Write-Host "Found $exeCount exe files in dist/Win10"
         }
 
     - name: Upload Win10 artifact
@@ -241,7 +241,7 @@ jobs:
         retention-days: 30
 
   # ========================================
-  # 步骤4: 创建 Release (合并两个构建结果)
+  # 步骤4: 创建 Release
   # ========================================
   create-release:
     needs: [get-version, build-win7, build-win10]
@@ -266,11 +266,13 @@ jobs:
 
     - name: List downloaded files
       run: |
-        echo "Win7 files:"
-        ls -la dist/Win7/
+        echo "=== Win7 files ==="
+        find dist/Win7 -type f -name "*.exe" 2>/dev/null || echo "No exe found"
+        ls -la dist/Win7/ 2>/dev/null || echo "Directory not found"
         echo ""
-        echo "Win10 files:"
-        ls -la dist/Win10/
+        echo "=== Win10 files ==="
+        find dist/Win10 -type f -name "*.exe" 2>/dev/null || echo "No exe found"
+        ls -la dist/Win10/ 2>/dev/null || echo "Directory not found"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
