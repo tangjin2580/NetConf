@@ -139,14 +139,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist/
+          pattern: '*-Build'
+          merge-multiple: true
 
       - name: Show files
         run: |
-          echo "=== Win7 ==="
-          ls -la dist/Win7/
-          echo ""
-          echo "=== Win10 ==="
-          ls -la dist/Win10/
+          echo "=== Checking dist structure ==="
+          find dist/ -type f -name "*.exe" 2>/dev/null || echo "No exe found in dist/"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -195,15 +194,19 @@ jobs:
           prerelease: false
 
       - name: Upload Win7 exe
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ needs.get-version.outputs.new_version }}
-          assets: dist/Win7/*.exe
-        continue-on-error: true
+        run: |
+          WIN7_EXE=$(find dist/Win7 -name "*.exe" -type f 2>/dev/null | head -1)
+          if [ -n "$WIN7_EXE" ]; then
+            echo "Found Win7 exe: $WIN7_EXE"
+            # Copy to known location for upload
+            cp "$WIN7_EXE" dist/Win7.exe
+          fi
 
       - name: Upload Win10 exe
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ needs.get-version.outputs.new_version }}
-          assets: dist/Win10/*.exe
-        continue-on-error: true
+        run: |
+          WIN10_EXE=$(find dist/Win10 -name "*.exe" -type f 2>/dev/null | head -1)
+          if [ -n "$WIN10_EXE" ]; then
+            echo "Found Win10 exe: $WIN10_EXE"
+            # Copy to known location for upload
+            cp "$WIN10_EXE" dist/Win10.exe
+          fi
