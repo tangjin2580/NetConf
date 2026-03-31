@@ -7,334 +7,195 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 permissions:
   contents: write
 
-# 完整的打包工作流
 jobs:
-  # ========================================
-  # 步骤1: 获取版本号
-  # ========================================
+  # 获取版本号
   get-version:
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.get_version.outputs.NEW_VERSION }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Get or create version
-      id: get_version
-      run: |
-        # 获取所有标签
-        git fetch --tags
-        TAGS=$(git tag -l "v*.*.*" 2>/dev/null | sort -V -r | head -1)
-        
-        if [ -n "$TAGS" ]; then
-          VERSION=${TAGS#v}
-          # 增加版本号
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3)
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="v$MAJOR.$MINOR.$NEW_PATCH"
-        else
-          NEW_VERSION="v1.0.0"
-        fi
-        
-        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "Generated version: $NEW_VERSION"
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # ========================================
-  # 步骤2: Win7 兼容版本 - Python 3.8
-  # ========================================
+      - name: Get or create version
+        id: get_version
+        run: |
+          git fetch --tags
+          TAGS=$(git tag -l "v*.*.*" 2>/dev/null | sort -V -r | head -1)
+
+          if [ -n "$TAGS" ]; then
+            VERSION=${TAGS#v}
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            PATCH=$(echo $VERSION | cut -d. -f3)
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="v$MAJOR.$MINOR.$NEW_PATCH"
+          else
+            NEW_VERSION="v1.0.0"
+          fi
+
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+  # Win7 兼容版本 - Python 3.8
   build-win7:
     runs-on: windows-latest
     needs: get-version
-    env:
-      NEW_VERSION: ${{ needs.get-version.outputs.NEW_VERSION }}
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3.8 for Win7
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.8'
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
 
-    - name: Install dependencies for Win7
-      run: |
-        python -m pip install --upgrade pip
-        pip install "Pillow>=9.0.0,<10.0.0"
-        pip install "requests>=2.28.0,<3.0.0"
-        pip install "pyinstaller>=5.13.0,<6.0.0"
-        pip install "setuptools>=65.0.0"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "Pillow>=9.0.0,<10.0.0" "requests>=2.28.0,<3.0.0" "pyinstaller>=5.13.0,<6.0.0"
 
-    - name: Build Win7 executable
-      run: |
-        if (Test-Path "Conf-win7.spec") {
-            pyinstaller --clean Conf-win7.spec --noconfirm
-        } else {
-            Write-Host "使用命令行模式构建Win7版本..."
-            pyinstaller --clean --onefile --windowed `
-              --name="医保网络配置工具-Win7" `
-              --hidden-import=config.settings `
-              --hidden-import=config `
-              --hidden-import=core.network `
-              --hidden-import=core.hosts `
-              --hidden-import=core.system `
-              --hidden-import=utils.cache `
-              --hidden-import=utils.server `
-              --hidden-import=utils `
-              --hidden-import=PIL `
-              --hidden-import=requests `
-              --hidden-import=charset_normalizer `
-              --hidden-import=idna `
-              --hidden-import=urllib3 `
-              --hidden-import=certifi `
-              --collect-all=PIL `
-              --collect-all=requests `
-              --add-data "config;config" `
-              --add-data "core;core" `
-              --add-data "utils;utils" `
-              main.py
-        }
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --windowed --name="医保网络配置工具-Win7" main.py
 
-    - name: Create Win7 package
-      shell: pwsh
-      run: |
-        # 创建输出目录
-        New-Item -ItemType Directory -Path "dist/Win7" -Force | Out-Null
-        
-        # 查找所有exe文件（递归搜索）
-        Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | ForEach-Object {
-            $destPath = "dist/Win7/$($_.Name)"
-            if (!(Test-Path $destPath)) {
-                Copy-Item $_.FullName "dist/Win7/"
-                Write-Host "Copied: $($_.FullName) -> dist/Win7/$($_.Name)"
-            }
-        }
-        
-        # 确保至少有一个exe文件
-        $exeCount = (Get-ChildItem "dist/Win7" -Filter "*.exe").Count
-        if ($exeCount -eq 0) {
-            Write-Host "Warning: No exe found, checking dist structure..."
-            Get-ChildItem -Path "dist" -Recurse -Filter "*.exe" | Format-Table FullName
-        } else {
-            Write-Host "Found $exeCount exe files in dist/Win7"
-        }
-        
-        # 创建运行库安装脚本
-        $batContent = @"
-@echo off
-chcp 65001 > nul
-echo ========================================
-echo   正在检查运行库...
-echo ========================================
-echo.
-echo Windows 7 用户请确保已安装 KB2533623 更新
-echo 下载: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
-echo.
-echo 正在打开运行库下载页面...
-echo.
-powershell -Command "Start-Process 'https://aka.ms/vs/17/release/vc_redist.x64.exe'"
-powershell -Command "Start-Process 'https://aka.ms/vs/17/release/vc_redist.x86.exe'"
-echo.
-echo 请在新窗口中安装运行库，然后运行主程序
-echo.
-pause
-"@
-        $batContent | Out-File -FilePath "dist/Win7/安装运行库.bat" -Encoding UTF8
+      - name: Create Win7 package
+        run: |
+          mkdir -p dist/Win7
+          cp dist/*.exe dist/Win7/ 2>/dev/null || cp dist/医保网络配置工具-Win7.exe dist/Win7/
+          echo @echo off > dist/Win7/安装运行库.bat
+          echo chcp 65001 ^> nul >> dist/Win7/安装运行库.bat
+          echo echo 正在打开运行库下载页面... >> dist/Win7/安装运行库.bat
+          echo start https://aka.ms/vs/17/release/vc_redist.x64.exe >> dist/Win7/安装运行库.bat
+          echo start https://aka.ms/vs/17/release/vc_redist.x86.exe >> dist/Win7/安装运行库.bat
+          echo pause >> dist/Win7/安装运行库.bat
 
-    - name: Upload Win7 artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Win7-Build
-        path: dist/Win7/
-        retention-days: 30
+      - name: Upload Win7 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Win7-Build
+          path: dist/Win7/
+          retention-days: 30
 
-  # ========================================
-  # 步骤3: Win10/11 优化版本 - Python 3.11
-  # ========================================
+  # Win10/11 优化版本 - Python 3.11
   build-win10:
     runs-on: windows-latest
     needs: get-version
-    env:
-      NEW_VERSION: ${{ needs.get-version.outputs.NEW_VERSION }}
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3.11 for Win10
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies for Win10
-      run: |
-        python -m pip install --upgrade pip
-        pip install Pillow requests pyinstaller setuptools wheel
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pillow requests pyinstaller
 
-    - name: Build Win10 executable
-      run: |
-        if (Test-Path "Conf-win10.spec") {
-            pyinstaller --clean Conf-win10.spec --noconfirm
-        } else {
-            Write-Host "使用命令行模式构建Win10版本..."
-            pyinstaller --clean --onefile --windowed `
-              --name="医保网络配置工具-Win10" `
-              --hidden-import=config.settings `
-              --hidden-import=config `
-              --hidden-import=core.network `
-              --hidden-import=core.hosts `
-              --hidden-import=core.system `
-              --hidden-import=utils.cache `
-              --hidden-import=utils.server `
-              --hidden-import=utils `
-              --hidden-import=PIL `
-              --hidden-import=requests `
-              --hidden-import=charset_normalizer `
-              --hidden-import=idna `
-              --hidden-import=urllib3 `
-              --hidden-import=certifi `
-              --collect-all=PIL `
-              --collect-all=requests `
-              --add-data "config;config" `
-              --add-data "core;core" `
-              --add-data "utils;utils" `
-              main.py
-        }
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --windowed --name="医保网络配置工具-Win10" main.py
 
-    - name: Create Win10 package
-      shell: pwsh
-      run: |
-        # 创建输出目录
-        New-Item -ItemType Directory -Path "dist/Win10" -Force | Out-Null
-        
-        # 查找所有exe文件（递归搜索）
-        Get-ChildItem -Path "dist" -Filter "*.exe" -Recurse | ForEach-Object {
-            $destPath = "dist/Win10/$($_.Name)"
-            if (!(Test-Path $destPath)) {
-                Copy-Item $_.FullName "dist/Win10/"
-                Write-Host "Copied: $($_.FullName) -> dist/Win10/$($_.Name)"
-            }
-        }
-        
-        # 确保至少有一个exe文件
-        $exeCount = (Get-ChildItem "dist/Win10" -Filter "*.exe").Count
-        if ($exeCount -eq 0) {
-            Write-Host "Warning: No exe found, checking dist structure..."
-            Get-ChildItem -Path "dist" -Recurse -Filter "*.exe" | Format-Table FullName
-        } else {
-            Write-Host "Found $exeCount exe files in dist/Win10"
-        }
+      - name: Create Win10 package
+        run: |
+          mkdir -p dist/Win10
+          cp dist/*.exe dist/Win10/ 2>/dev/null || cp dist/医保网络配置工具-Win10.exe dist/Win10/
 
-    - name: Upload Win10 artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Win10-Build
-        path: dist/Win10/
-        retention-days: 30
+      - name: Upload Win10 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Win10-Build
+          path: dist/Win10/
+          retention-days: 30
 
-  # ========================================
-  # 步骤4: 创建 Release
-  # ========================================
+  # 创建 Release
   create-release:
     needs: [get-version, build-win7, build-win10]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Download Win7 artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: Win7-Build
-        path: dist/Win7
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
 
-    - name: Download Win10 artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: Win10-Build
-        path: dist/Win10
+      - name: Show files
+        run: |
+          echo "=== Win7 ==="
+          ls -la dist/Win7/
+          echo ""
+          echo "=== Win10 ==="
+          ls -la dist/Win10/
 
-    - name: List downloaded files
-      run: |
-        echo "=== Win7 files ==="
-        find dist/Win7 -type f -name "*.exe" 2>/dev/null || echo "No exe found"
-        ls -la dist/Win7/ 2>/dev/null || echo "Directory not found"
-        echo ""
-        echo "=== Win10 files ==="
-        find dist/Win10 -type f -name "*.exe" 2>/dev/null || echo "No exe found"
-        ls -la dist/Win10/ 2>/dev/null || echo "Directory not found"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.get-version.outputs.new_version }}
+          release_name: 医保网络配置工具 ${{ needs.get-version.outputs.new_version }}
+          body: |
+            ## 医保网络配置工具 ${{ needs.get-version.outputs.new_version }}
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.get-version.outputs.new_version }}
-        release_name: 医保网络配置工具 ${{ needs.get-version.outputs.new_version }}
-        body: |
-          ## 医保网络配置工具 ${{ needs.get-version.outputs.new_version }}
+            ### 选择适合您的版本
 
-          ### 选择适合您的版本
+            | 版本 | Python | 适用系统 | 推荐场景 |
+            |------|--------|---------|---------|
+            | **Win10/11** | 3.11 | Windows 10/11 | 推荐大多数用户使用 |
+            | **Win7兼容** | 3.8 | Windows 7 SP1+ / 8.1 / 10 | 旧系统用户 |
 
-          | 版本 | Python | 适用系统 | 推荐场景 |
-          |------|--------|---------|---------|
-          | **Win10/11** | 3.11 | Windows 10/11 | 推荐大多数用户使用 |
-          | **Win7兼容** | 3.8 | Windows 7 SP1+ / 8.1 / 10 | 旧系统用户 |
+            ---
 
-          ---
+            ### Win7 兼容版本
+            **适用系统**: Windows 7 SP1+ / 8.1 / 10
 
-          ### Win10/11 版本 (推荐)
-          - 性能优化
-          - 支持最新功能
-          - 推荐大多数用户使用
+            #### 系统要求
+            - Windows 7 SP1 或更高版本
+            - **必须安装 KB2533623 更新** ([下载地址](https://www.microsoft.com/zh-cn/download/details.aspx?id=26764))
+            - Visual C++ 运行库
 
-          ### Win7 兼容版本
-          **适用系统**: Windows 7 SP1+ / 8.1 / 10
+            #### 下载运行库
+            - [vc_redist.x64.exe](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+            - [vc_redist.x86.exe](https://aka.ms/vs/17/release/vc_redist.x86.exe)
 
-          #### 系统要求
-          - Windows 7 SP1 或更高版本
-          - **必须安装 KB2533623 更新** ([下载地址](https://www.microsoft.com/zh-cn/download/details.aspx?id=26764))
-          - Visual C++ 运行库
+            ---
 
-          #### 下载运行库
-          - [vc_redist.x64.exe](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-          - [vc_redist.x86.exe](https://aka.ms/vs/17/release/vc_redist.x86.exe)
+            ### 主要功能
+            - 医保网络检测（ping + 连通性测试）
+            - 双WAN配置（路由器模式）
+            - 单机配置（直连模式）
+            - Hosts文件管理
+            - 配置信息服务器（支持在线编辑）
+            - 防护软件安装检测
 
-          ---
+            ### 使用说明
+            1. 选择适合您系统的版本下载
+            2. Win7用户请先安装运行库和KB2533623更新
+            3. 右键以管理员身份运行
+          draft: false
+          prerelease: false
 
-          ### 主要功能
-          - 医保网络检测（ping + 连通性测试）
-          - 双WAN配置（路由器模式）
-          - 单机配置（直连模式）
-          - Hosts文件管理
-          - 配置信息服务器（支持在线编辑）
-          - 防护软件安装检测
+      - name: Upload Win7 exe
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.get-version.outputs.new_version }}
+          assets: dist/Win7/*.exe
+        continue-on-error: true
 
-          ### 使用说明
-          1. 选择适合您系统的版本下载
-          2. Win7用户请先安装运行库和KB2533623更新
-          3. 右键以管理员身份运行
-        draft: false
-        prerelease: false
-
-    - name: Upload Win7 Executable
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.get-version.outputs.new_version }}
-        assets: dist/Win7/*.exe
-      continue-on-error: true
-
-    - name: Upload Win10 Executable
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.get-version.outputs.new_version }}
-        assets: dist/Win10/*.exe
-      continue-on-error: true
+      - name: Upload Win10 exe
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.get-version.outputs.new_version }}
+          assets: dist/Win10/*.exe
+        continue-on-error: true
