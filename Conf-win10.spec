@@ -3,8 +3,10 @@
 # Python 3.11 + PyInstaller 6.x
 # 支持: Windows 10 1903+, Windows 11
 #
-# 与 Win7 版本一致：win_private_assemblies=True 将 Visual C++ / Universal CRT
-# 作为私有程序集打包进 dist 目录，目标机免安装运行库；upx=False 关闭压缩。
+# 运行库说明（与 Win7 不同）：
+#   Win10/11 系统自带 Universal CRT，且 PyInstaller 会自动收集 vcruntime140/msvcp140，
+#   因此无需 win_private_assemblies（该参数已在 PyInstaller 6.0 移除，留着会直接报错）。
+#   upx=False 关闭压缩，兼容老杀软。
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -72,7 +74,6 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_private_assemblies=True,
     cipher=block_cipher,
     noarchive=False,
 )
