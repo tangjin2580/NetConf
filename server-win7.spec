@@ -1,26 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Windows 10/11 (x64) 优化版本打包配置
-# Python 3.11 + PyInstaller 6.x
-# 支持: Windows 10 1903+, Windows 11
+# 独立服务器程序打包配置（运行库内置，免安装）
+# 入口: utils/server.py
 #
-# 与 Win7 版本一致：win_private_assemblies=True 将 Visual C++ / Universal CRT
-# 作为私有程序集打包进 dist 目录，目标机免安装运行库；upx=False 关闭压缩。
+# 与 Win7 主程序一致：
+#   win_private_assemblies=True  -> VC++ / Universal CRT 作为私有程序集打包，目标机免安装
+#   upx=False                    -> 关闭压缩，兼容老系统 / 杀毒软件
 
 from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
-# 基础配置
-app_name = '医保网络配置工具'
+app_name = '医保配置服务器'
 version = '1.0.0'
 
 a = Analysis(
-    ['main.py'],
+    ['utils/server.py'],
     pathex=[],
     binaries=[],
     datas=[],
     hiddenimports=[
-        # requests 相关
+        # requests 相关（服务器用 requests 调用自身 API）
         'requests',
         'requests.adapters',
         'requests.api',
@@ -47,23 +46,9 @@ a = Analysis(
         'urllib3.response',
         'urllib3.poolmanager',
         'certifi',
-        # Pillow 相关
-        'PIL',
-        'PIL.Image',
-        'PIL.ImageTk',
-        'PIL.PngImagePlugin',
-        'PIL.JpegImagePlugin',
-        'PIL.BmpImagePlugin',
-        'PIL.GifImagePlugin',
-        'PIL.ImageFont',
-        'PIL.ImageDraw',
         # 项目模块
         'config',
         'config.settings',
-        'core',
-        'core.network',
-        'core.hosts',
-        'core.system',
         'utils',
         'utils.cache',
         'utils.server',
@@ -72,6 +57,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
+    # ↓↓↓ 运行库内置，目标机免安装 ↓↓↓
     win_private_assemblies=True,
     cipher=block_cipher,
     noarchive=False,
@@ -85,13 +71,15 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name=app_name,
-    icon='icon.ico',
+    icon='icon.ico' if __import__('os').path.exists('icon.ico') else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
+    # ↓↓↓ 关闭 UPX，兼容老系统 / 老杀软 ↓↓↓
     upx=False,
     upx_exclude=[],
-    console=False,
+    # 服务器为常驻进程，保留控制台窗口便于查看日志
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -101,7 +89,7 @@ exe = EXE(
         'FileVersion': version,
         'ProductVersion': version,
         'ProductName': app_name,
-        'FileDescription': '医保网络配置工具',
+        'FileDescription': '医保配置服务器',
         'LegalCopyright': 'Copyright 2024',
     },
 )
@@ -114,5 +102,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name=f'{app_name}-Win10',
+    name=app_name,
 )

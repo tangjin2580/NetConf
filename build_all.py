@@ -151,31 +151,18 @@ start "" "%~dp0{PROJECT_NAME}.exe"
     print(f"已创建启动器: {launcher_path}")
 
 
-def create_vcredist_bat(output_dir):
-    """创建VC++运行库安装提示批处理"""
-    content = '''@echo off
-chcp 65001 > nul
-echo ========================================
-echo   Visual C++ 运行库安装
-echo ========================================
-echo.
-echo 如果程序无法运行，请安装以下运行库:
-echo.
-echo 下载地址:
-echo   https://aka.ms/vs/17/release/vc_redist.x64.exe
-echo   https://aka.ms/vs/17/release/vc_redist.x86.exe
-echo.
-echo 直链下载:
-echo   x64: https://aka.ms/vs/17/release/vc_redist.x64.exe
-echo   x86: https://aka.ms/vs/17/release/vc_redist.x86.exe
-echo.
-pause
-'''
-    
-    vcredist_path = output_dir / '安装运行库.bat'
-    with open(vcredist_path, 'w', encoding='utf-8') as f:
+def create_bundled_note(output_dir):
+    """创建『运行库已内置』说明文件（无需客户机安装任何运行库）"""
+    content = (
+        '本程序已将 Visual C++ 运行库与 Universal CRT 一并打包，\n'
+        '无需在客户机上安装任何运行库，可直接双击运行。\n'
+        '如仍提示缺少 dll，请确认客户机为 64 位系统，\n'
+        '以及系统是否为 Windows 7 SP1 及以上。\n'
+    )
+    note_path = output_dir / '运行库已内置-无需安装.txt'
+    with open(note_path, 'w', encoding='utf-8') as f:
         f.write(content)
-    print(f"已创建VC++安装提示: {vcredist_path}")
+    print(f"已创建运行库说明: {note_path}")
 
 
 def create_readme(output_dir, config_name):
@@ -195,19 +182,17 @@ def create_readme(output_dir, config_name):
 ### 安装说明
 1. 解压到任意目录
 2. 双击运行 "{PROJECT_NAME}.exe"
-3. 如遇运行错误，请先安装 "安装运行库.bat" 中的 Visual C++ 运行库
-
-### 下载运行库
-x64: https://aka.ms/vs/17/release/vc_redist.x64.exe
-x86: https://aka.ms/vs/17/release/vc_redist.x86.exe
+3. 运行库已内置（Visual C++ / Universal CRT），无需安装；如遇错误请确认
+   客户机为 64 位系统，且系统为 Windows 7 SP1 及以上
 
 ### 常见问题
 Q: 提示缺少DLL?
-A: 请安装上方提供的Visual C++运行库
+A: 运行库已随包内置。多为客户机为 32 位系统（本版本仅支持 64 位），
+   请确认系统位数后重新下载。
 
 Q: Windows 7 无法运行?
-A: 请确保系统已安装 KB2533623 更新
-   下载地址: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
+A: 请确认系统为 Windows 7 SP1；极少数未打更新的老系统可离线安装
+   KB2533623 更新: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
 
 ---
 生成时间: {subprocess.run(['date'], capture_output=True, text=True).stdout.strip()}
@@ -250,7 +235,7 @@ def build_all():
             dist_dir = OUTPUT_DIR / f'{PROJECT_NAME}-{config.name}'
             if dist_dir.exists():
                 create_launcher_bat(dist_dir, config.name)
-                create_vcredist_bat(dist_dir)
+                create_bundled_note(dist_dir)
                 create_readme(dist_dir, config.name)
             success_count += 1
     

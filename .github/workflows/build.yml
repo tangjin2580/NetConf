@@ -41,7 +41,7 @@ jobs:
 
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-  # Win7 兼容版本 - Python 3.8
+  # Win7 兼容版本 (x64) - Python 3.8，运行库内置，免安装
   build-win7:
     runs-on: windows-latest
     needs: get-version
@@ -63,28 +63,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install "Pillow>=9.0.0,<10.0.0" "requests>=2.28.0,<3.0.0" "pyinstaller>=5.13.0,<6.0.0"
 
-      - name: Build executable
+      # 使用项目内的 spec：win_private_assemblies=True 会把 CRT 一并打包，目标机免安装
+      - name: Build executable (运行库内置)
         run: |
-          pyinstaller --onefile --windowed --icon="icon.ico" --name="医保网络配置工具-Win7" main.py
+          pyinstaller Conf-win7.spec --noconfirm
 
-      - name: Create Win7 package
+      - name: 添加说明文件
         run: |
-          mkdir -p dist/Win7
-          cp dist/*.exe dist/Win7/ 2>/dev/null || cp "dist/医保网络配置工具-Win7.exe" dist/Win7/
-          cat > dist/Win7/安装运行库.bat << 'EOF'
-          @echo off
-          chcp 65001 > nul
-          echo 正在打开运行库下载页面...
-          start https://aka.ms/vs/17/release/vc_redist.x64.exe
-          start https://aka.ms/vs/17/release/vc_redist.x86.exe
-          pause
+          cat > "dist/医保网络配置工具-Win7/运行库已内置-无需安装.txt" << 'EOF'
+          本程序已将 Visual C++ 运行库与 Universal CRT 一并打包，
+          无需在客户机上安装任何运行库，可直接双击运行。
+          如仍提示缺少 dll，请确认系统为 Windows 7 SP1 及以上。
           EOF
 
       - name: Upload Win7 artifact
         uses: actions/upload-artifact@v4
         with:
           name: Win7-Build
-          path: dist/Win7/
+          path: dist/医保网络配置工具-Win7/
           retention-days: 30
 
   # Win10/11 优化版本 - Python 3.11
@@ -107,22 +103,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install Pillow requests pyinstaller
+          pip install "Pillow>=9.0.0,<10.0.0" "requests>=2.28.0,<3.0.0" "pyinstaller>=6.0.0"
 
-      - name: Build executable
+      # 使用项目内的 spec：win_private_assemblies=True 把 CRT 一并打包，目标机免安装；upx=False 关闭压缩
+      - name: Build executable (运行库一并内置)
         run: |
-          pyinstaller --onefile --windowed --icon="icon.ico" --name="医保网络配置工具-Win10" main.py
-
-      - name: Create Win10 package
-        run: |
-          mkdir -p dist/Win10
-          cp dist/*.exe dist/Win10/ 2>/dev/null || cp "dist/医保网络配置工具-Win10.exe" dist/Win10/
+          pyinstaller Conf-win10.spec --noconfirm
 
       - name: Upload Win10 artifact
         uses: actions/upload-artifact@v4
         with:
           name: Win10-Build
-          path: dist/Win10/
+          path: dist/医保网络配置工具-Win10/
           retention-days: 30
 
   # 创建 Release
@@ -140,16 +132,14 @@ jobs:
         with:
           path: ./artifacts
 
-      - name: Organize files
+      - name: Organize & zip
         run: |
           mkdir -p release
-          # 复制 Win7 文件
-          cp ./artifacts/Win7-Build/*.exe release/
-          cp ./artifacts/Win7-Build/*.bat release/
-          # 复制 Win10 文件
-          cp ./artifacts/Win10-Build/*.exe release/
-          
-          # 显示文件列表
+          # Win7 x64 绿色版（运行库已内置，免安装）
+          (cd ./artifacts/Win7-Build && zip -r ../../release/医保网络配置工具-Win7.zip .)
+          # Win10/11 版
+          (cd ./artifacts/Win10-Build && zip -r ../../release/医保网络配置工具-Win10.zip .)
+
           echo "=== Release files ==="
           ls -lh release/
 
@@ -163,20 +153,22 @@ jobs:
 
             ### 选择适合您的版本
 
-            | 版本 | Python | 适用系统 | 推荐场景 |
-            |------|--------|---------|---------|
-            | **Win10/11** | 3.11 | Windows 10/11 | 推荐大多数用户使用 |
-            | **Win7兼容** | 3.8 | Windows 7 SP1+ / 8.1 / 10 | 旧系统用户 |
+            | 版本 | 适用系统 | 推荐场景 |
+            |------|---------|---------|
+            | **Win7 兼容** | 64 位 Windows 7 SP1+ / 8.1 / 10 | 旧电脑（运行库已内置） |
+            | **Win10/11** | Windows 10 / 11 | 新电脑 |
+
+            > **运行库已内置**：以上版本均已将 Visual C++ 运行库与 Universal CRT 打包进程序，
+            > 客户机**无需安装任何运行库**，解压后直接双击即可运行。
 
             ---
 
-            ### Win7 兼容版本
-            **适用系统**: Windows 7 SP1+ / 8.1 / 10
-
-            #### 系统要求
-            - Windows 7 SP1 或更高版本
-            - **必须安装 KB2533623 更新** ([下载地址](https://www.microsoft.com/zh-cn/download/details.aspx?id=26764))
-            - Visual C++ 运行库
+            ### ⚠️ 老电脑特别说明
+            - 本版本为 **64 位**，请确认客户机为 64 位系统（右键「计算机」→ 属性查看）。
+            - 建议系统至少为 **Windows 7 SP1**。如仍提示缺少 dll，可离线安装
+              [KB2533623](https://www.microsoft.com/zh-cn/download/details.aspx?id=26764)
+              与 [Win7 SP1](https://www.catalog.update.microsoft.com/)（均为离线包，无需联网升级）。
+            - 个别老旧杀毒软件可能误报，加入白名单即可。
 
             ---
 
@@ -189,11 +181,10 @@ jobs:
             - 防护软件安装检测
 
             ### 使用说明
-            1. 选择适合您系统的版本下载
-            2. Win7用户请先安装运行库和KB2533623更新
-            3. 右键以管理员身份运行
+            1. 按系统位数选择对应版本下载并解压
+            2. **右键「以管理员身份运行」**（本工具需要修改网络/hosts，必须管理员权限）
+            3. 如被杀软拦截，请允许/加入白名单
           draft: false
           prerelease: false
           files: |
-            release/*.exe
-            release/*.bat
+            release/*.zip

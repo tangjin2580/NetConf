@@ -1,7 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Windows 7 x64/x86 兼容版本打包配置
+# Windows 7 兼容版本打包配置（运行库内置，免安装）
 # Python 3.8 + PyInstaller 5.13
-# 支持: Windows 7 SP1+, Windows 8.1, Windows 10/11
+# 支持: Windows 7 SP1+ / 8.1 / 10 / 11（x64）
+#
+# 关键修复：
+#   win_private_assemblies=True
+#     会把 MSVC CRT 与 Universal CRT (api-ms-win-crt-*.dll / ucrtbase.dll)
+#     作为「私有并行程序集」一起打进 dist 目录。
+#     目标机「无需安装任何 Visual C++ 运行库」即可直接运行，专门解决老电脑打不开的问题。
+#
+#   upx=False
+#     关闭 UPX 压缩，避免老旧系统 / 杀毒软件导致加载失败（表现为双击无反应）。
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -69,8 +78,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
+    # ↓↓↓ 核心修复：运行库内置，目标机免安装 ↓↓↓
+    win_private_assemblies=True,
     cipher=block_cipher,
     noarchive=False,
 )
@@ -111,7 +120,8 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # ↓↓↓ 关闭 UPX，兼容老系统 / 老杀软 ↓↓↓
+    upx=False,
     upx_exclude=[],
     console=False,
     disable_windowed_traceback=False,
@@ -136,7 +146,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
-    name=f'{app_name}-Win7-x64',
+    name=f'{app_name}-Win7',
 )
