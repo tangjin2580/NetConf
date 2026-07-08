@@ -41,6 +41,10 @@ echo [4/4] 打包服务器程序（可选，运行库已内置）...
 pyinstaller --clean server-win7.spec
 
 echo.
+echo [+] 复制运行库说明（含未打 SP1 的早期 Win7 兜底）...
+if exist "dist\医保网络配置工具-Win7" copy /Y "运行库已内置-无需安装.txt" "dist\医保网络配置工具-Win7\" >nul
+
+echo.
 echo ======================================
 echo 打包完成!
 echo ======================================

@@ -1,0 +1,22 @@
+﻿医保网络配置工具 - 运行库已内置，免安装
+
+【支持的系统（64 位）】
+- Windows 7（含未安装 SP1 的早期版本 / RTM）
+- Windows 7 SP1 / 8.1 / 10 / 11
+- 本程序为 64 位，仅支持 64 位系统
+
+【无需安装任何运行库】
+本程序已将 Visual C++ 运行库 与 Universal CRT
+（api-ms-win-crt-*.dll / ucrtbase.dll）一并打包在程序目录中。
+解压后直接双击「医保网络配置工具.exe」即可运行，
+客户机上不需要安装任何 Visual C++ 运行库。
+
+【极少数未打 SP1 的早期 Win7 仍打不开？】
+个别 Windows 7 早期版本（未装 Service Pack 1）若因缺少系统更新无法启动，
+只需离线安装一次 SP1 即可（无需联网升级，拷过去装就行）：
+  1. 下载 Windows 7 SP1 离线安装包（KB976932，选 64 位）：
+     https://www.catalog.update.microsoft.com/  （搜索 KB976932）
+  2. 双击安装并重启电脑
+  3. 再次双击本程序即可运行
+
+如仍有问题，请提供：系统版本（按 Win+R 输入 winver 查看）与报错截图。

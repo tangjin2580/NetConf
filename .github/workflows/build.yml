@@ -68,13 +68,9 @@ jobs:
         run: |
           pyinstaller Conf-win7.spec --noconfirm
 
-      - name: 添加说明文件
+      - name: 复制运行库说明（含未打 SP1 的早期 Win7 兜底）
         run: |
-          cat > "dist/医保网络配置工具-Win7/运行库已内置-无需安装.txt" << 'EOF'
-          本程序已将 Visual C++ 运行库与 Universal CRT 一并打包，
-          无需在客户机上安装任何运行库，可直接双击运行。
-          如仍提示缺少 dll，请确认系统为 Windows 7 SP1 及以上。
-          EOF
+          cp "运行库已内置-无需安装.txt" "dist/医保网络配置工具-Win7/"
 
       - name: Upload Win7 artifact
         uses: actions/upload-artifact@v4
@@ -105,7 +101,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install "Pillow>=9.0.0,<10.0.0" "requests>=2.28.0,<3.0.0" "pyinstaller>=6.0.0"
 
-      # 使用项目内的 spec：win_private_assemblies=True 把 CRT 一并打包，目标机免安装；upx=False 关闭压缩
+      # 使用项目内的 Conf-win10.spec（upx=False 关闭压缩）。Win10/11 自带 Universal CRT，
+      # PyInstaller 会自动收集 vcruntime140/msvcp140，目标机同样免安装运行库。
       - name: Build executable (运行库一并内置)
         run: |
           pyinstaller Conf-win10.spec --noconfirm

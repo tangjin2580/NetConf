@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # Windows 7 兼容版本打包配置（运行库内置，免安装）
 # Python 3.8 + PyInstaller 5.13
-# 支持: Windows 7 SP1+ / 8.1 / 10 / 11（x64）
+# 支持: Windows 7 (含未打 SP1 的早期版本 / RTM) / 8.1 / 10 / 11（x64）
 #
 # 关键修复：
 #   win_private_assemblies=True
@@ -78,7 +78,9 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    # ↓↓↓ 核心修复：运行库内置，目标机免安装 ↓↓↓
+    # ↓↓↓ 核心修复：运行库(app-local UCRT)内置，目标机免安装 ↓↓↓
+    # 同时兼容未打 SP1 的 Windows 7 早期版本(RTM)：UCRT 以「应用本地」方式随包，
+    # 不依赖系统全局运行库，老电脑（含未装 SP1 的）无需安装任何 VC++ 运行库即可运行。
     win_private_assemblies=True,
     cipher=block_cipher,
     noarchive=False,

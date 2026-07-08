@@ -152,16 +152,21 @@ start "" "%~dp0{PROJECT_NAME}.exe"
 
 
 def create_bundled_note(output_dir):
-    """创建『运行库已内置』说明文件（无需客户机安装任何运行库）"""
-    content = (
-        '本程序已将 Visual C++ 运行库与 Universal CRT 一并打包，\n'
-        '无需在客户机上安装任何运行库，可直接双击运行。\n'
-        '如仍提示缺少 dll，请确认客户机为 64 位系统，\n'
-        '以及系统是否为 Windows 7 SP1 及以上。\n'
-    )
+    """复制『运行库已内置』说明文件（含未打 SP1 的早期 Win7 离线兜底），无需客户机安装任何运行库"""
+    src = Path('运行库已内置-无需安装.txt')
     note_path = output_dir / '运行库已内置-无需安装.txt'
-    with open(note_path, 'w', encoding='utf-8') as f:
-        f.write(content)
+    if src.exists():
+        shutil.copyfile(str(src), str(note_path))
+    else:
+        # 兜底：源文件缺失时仍生成一个基础说明
+        content = (
+            '本程序已将 Visual C++ 运行库与 Universal CRT 一并打包，\n'
+            '无需在客户机上安装任何运行库，可直接双击运行。\n'
+            '极少数未打 SP1 的 Windows 7 早期版本如仍打不开，\n'
+            '可离线安装一次 SP1（KB976932）后重试。\n'
+        )
+        with open(note_path, 'w', encoding='utf-8') as f:
+            f.write(content)
     print(f"已创建运行库说明: {note_path}")
 
 
@@ -171,7 +176,7 @@ def create_readme(output_dir, config_name):
 ## 版本: {config_name}
 
 ### 系统要求
-- 最低: Windows 7 SP1 (KB2533623更新)
+- 最低: Windows 7（含未打 SP1 的早期版本，离线装一次 SP1 即可）
 - 推荐: Windows 10 1903 或更高版本
 
 ### 包含内容
@@ -190,9 +195,9 @@ Q: 提示缺少DLL?
 A: 运行库已随包内置。多为客户机为 32 位系统（本版本仅支持 64 位），
    请确认系统位数后重新下载。
 
-Q: Windows 7 无法运行?
-A: 请确认系统为 Windows 7 SP1；极少数未打更新的老系统可离线安装
-   KB2533623 更新: https://www.microsoft.com/zh-cn/download/details.aspx?id=26764
+Q: Windows 7（未打 SP1 的早期版本）无法运行?
+A: 极少数未打 SP1 的老系统可离线安装一次 SP1（KB976932）后重试，
+   无需联网升级：https://www.catalog.update.microsoft.com/ （搜索 KB976932，选 64 位）
 
 ---
 生成时间: {subprocess.run(['date'], capture_output=True, text=True).stdout.strip()}
