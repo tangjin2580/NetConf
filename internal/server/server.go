@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"gnetconf/internal/config"
@@ -32,6 +33,11 @@ func NewInfoServer() *InfoServer {
 func (s *InfoServer) Start() {
 	_ = os.MkdirAll(s.InfoFolder, 0o755)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				system.WriteCrashLog(fmt.Sprintf("server goroutine panic: %v\n\n%s", r, debug.Stack()))
+			}
+		}()
 		_ = http.ListenAndServe(fmt.Sprintf(":%d", s.Port), s.handler())
 	}()
 }

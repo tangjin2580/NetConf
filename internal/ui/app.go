@@ -136,12 +136,16 @@ func (a *App) Run() error {
 	if err := mw.Create(); err != nil {
 		return err
 	}
+	system.Trace("window created")
 
 	// 后台启动内嵌信息服务器（作为服务器模式时可用）
 	server.NewInfoServer().Start()
+	system.Trace("server started")
 
 	a.setStatus("就绪")
+	system.Trace("entering message loop")
 	a.mw.Run()
+	system.Trace("message loop ended")
 	return nil
 }
 

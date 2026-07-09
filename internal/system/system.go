@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"gnetconf/internal/config"
@@ -127,4 +128,34 @@ func StringsContains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// TracePath 返回启动追踪日志路径（exe 同级）
+func TracePath() string {
+	return filepath.Join(ExeDir(), "NetConf.startup.log")
+}
+
+// ResetTrace 每次启动时清空追踪日志，便于对照本次运行
+func ResetTrace() {
+	_ = os.Remove(TracePath())
+}
+
+// Trace 记录一条启动/运行里程碑到 exe 同级的 NetConf.startup.log
+// 用于真机排查“停止工作/打不开”等问题：崩溃点 = 日志最后一行之后。
+func Trace(step string) {
+	f, err := os.OpenFile(TracePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err == nil {
+		fmt.Fprintf(f, "%s %s\n", time.Now().Format("2006-01-02 15:04:05.000"), step)
+		f.Close()
+	}
+}
+
+// CrashLogPath 返回崩溃日志路径（exe 同级）
+func CrashLogPath() string {
+	return filepath.Join(ExeDir(), "NetConf.crash.log")
+}
+
+// WriteCrashLog 把崩溃信息写入 exe 同级的 NetConf.crash.log
+func WriteCrashLog(content string) {
+	_ = os.WriteFile(CrashLogPath(), []byte(content), 0o644)
 }
