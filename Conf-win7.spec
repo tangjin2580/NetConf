@@ -11,6 +11,12 @@
 #
 #   upx=False
 #     关闭 UPX 压缩，避免老旧系统 / 杀毒软件导致加载失败（表现为双击无反应）。
+#
+#   excludes=['pkg_resources', 'setuptools']
+#     排除项目未直接使用的模块。PyInstaller 内置运行时钩子 pyi_rth_pkgres 会在启动时自动
+#     import pkg_resources，其导入链触发加载 pyexpat.pyd；在未打补丁的 Win7 RTM 上，
+#     pyexpat 通过 UCRT 调系统 API 时返回"参数错误"(ERROR_INVALID_PARAMETER) 导致崩溃。
+#     排除后该钩子不触发，程序可正常启动。（项目自身代码不依赖这些模块）
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -77,7 +83,15 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # ↓↓↓ 关键修复：排除 pkg_resources / setuptools（项目未直接使用）↓↓↓
+        # PyInstaller 内置运行时钩子 pyi_rth_pkgres 会在启动时自动 import pkg_resources，
+        # 其导入链会触发加载 pyexpat.pyd。在未打补丁的 Win7 RTM 上，
+        # pyexpat 通过 UCRT 调用系统 API 时返回"参数错误"(ERROR_INVALID_PARAMETER) 导致崩溃。
+        # 项目自身代码不依赖 pkg_resources/setuptools，安全排除。
+        'pkg_resources',
+        'setuptools',
+    ],
     # ↓↓↓ 核心修复：运行库(app-local UCRT)内置，目标机免安装 ↓↓↓
     # 同时兼容未打 SP1 的 Windows 7 早期版本(RTM)：UCRT 以「应用本地」方式随包，
     # 不依赖系统全局运行库，老电脑（含未装 SP1 的）无需安装任何 VC++ 运行库即可运行。
