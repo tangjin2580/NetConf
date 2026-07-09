@@ -6,6 +6,6 @@ Write-Host "==> 生成 Windows 资源 (manifest + 图标) ..."
 go run github.com/akavel/rsrc@latest -arch amd64 -manifest app.manifest -ico icon.ico -o rsrc.syso
 
 Write-Host "==> 编译 NetConf.exe ..."
-go build -ldflags="-s -w" -o NetConf.exe .
+go build -ldflags="-s -w -H windowsgui" -o NetConf.exe .
 
 Write-Host "==> 完成: NetConf.exe"
