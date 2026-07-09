@@ -7,26 +7,29 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"unsafe"
-
-	"golang.org/x/sys/windows"
 
 	"gnetconf/internal/config"
 )
 
-// IsAdmin 判断当前进程是否以管理员权限运行
+// IsAdmin 判断当前进程是否以管理员权限运行（使用标准库 syscall，零外部依赖）
 func IsAdmin() bool {
-	var token windows.Token
-	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token); err != nil {
+	cur, err := syscall.GetCurrentProcess()
+	if err != nil {
+		return false
+	}
+	var token syscall.Token
+	if err := syscall.OpenProcessToken(cur, syscall.TOKEN_QUERY, &token); err != nil {
 		return false
 	}
 	defer token.Close()
 
 	var elevation uint32
 	var outLen uint32
-	if err := windows.GetTokenInformation(
+	if err := syscall.GetTokenInformation(
 		token,
-		windows.TokenElevation,
+		syscall.TokenElevation,
 		(*byte)(unsafe.Pointer(&elevation)),
 		uint32(unsafe.Sizeof(elevation)),
 		&outLen,
