@@ -303,6 +303,7 @@ func (a *App) hostsPage() declarative.TabPage {
 			declarative.Composite{Layout: declarative.HBox{}, Children: []declarative.Widget{
 				declarative.PushButton{Text: "检查并补全", OnClicked: func() { a.checkAndFixHosts() }},
 				declarative.PushButton{Text: "刷新状态", OnClicked: func() { a.refreshHostsStatus() }},
+				declarative.PushButton{Text: "打开文件目录", OnClicked: func() { a.openHostsDir() }},
 			}},
 			declarative.TextEdit{AssignTo: &a.hostsLog, ReadOnly: true, VScroll: true, MinSize: declarative.Size{Height: 220}},
 		},
@@ -358,6 +359,12 @@ func (a *App) refreshHostsStatus() {
 		}
 	}
 	a.hostsLog.SetText(sb.String())
+}
+
+func (a *App) openHostsDir() {
+	if err := hosts.OpenDir(); err != nil {
+		walk.MsgBox(a.mw, "错误", "无法打开目录: "+err.Error(), walk.MsgBoxOK|walk.MsgBoxIconError)
+	}
 }
 
 // ===================== 配置信息服务器 =====================

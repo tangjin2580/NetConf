@@ -253,7 +253,10 @@ func ApplyMissingConfig(iface, ip, mask, dns string, missing []string, cb Progre
 	}
 	if system.StringsContains(missing, "hosts 文件") {
 		if _, err := hosts.Modify(); err != nil {
-			errs = append(errs, "修改hosts失败: "+err.Error())
+			// 备选：直接写入失败则用临时文件 + move 覆盖
+			if _, err2 := hosts.ModifyForce(); err2 != nil {
+				errs = append(errs, "修改hosts失败: "+err2.Error())
+			}
 		}
 		step("正在修改hosts文件...")
 	}
