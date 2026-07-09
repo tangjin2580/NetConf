@@ -42,3 +42,9 @@ info/
 # OS
 .DS_Store
 Thumbs.db
+
+# Go build artifacts
+NetConf.exe
+*.syso
+*.test
+
