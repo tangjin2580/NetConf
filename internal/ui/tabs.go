@@ -248,7 +248,7 @@ func (a *App) applyStandalone(force bool) {
 		if force {
 			missing = []string{"IP 地址", "路由", "MTU", "hosts 文件"}
 		}
-		network.ApplyMissingConfig(iface, ip, mask, dns, missing, func(c, t int, m string) {
+		applyErrs := network.ApplyMissingConfig(iface, ip, mask, dns, missing, func(c, t int, m string) {
 			a.mw.Synchronize(func() { a.setStatus(fmt.Sprintf("[%d/%d] %s", c, t, m)) })
 		})
 
@@ -258,6 +258,13 @@ func (a *App) applyStandalone(force bool) {
 		sb.WriteString(fmt.Sprintf("MTU=1300: %v\n", network.MtuAlreadySet(iface)))
 		sb.WriteString(fmt.Sprintf("hosts 已配置: %v\n", hosts.AlreadySet()))
 		sb.WriteString(fmt.Sprintf("路由已配置: %v\n\n", network.RouteAlreadySet()))
+		if len(applyErrs) > 0 {
+			sb.WriteString("=== 执行错误 ===\n")
+			for _, e := range applyErrs {
+				sb.WriteString(e + "\n")
+			}
+			sb.WriteString("\n")
+		}
 		sb.WriteString("医保地址连通性测试:\n")
 		for _, h := range config.TargetHosts {
 			ok := network.TestHostConnectivity(h, 80, 3)

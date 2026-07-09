@@ -217,10 +217,11 @@ func GetMissingItems(iface string) []string {
 // ProgressCB 配置进度回调
 type ProgressCB func(current, total int, message string)
 
-// ApplyMissingConfig 按缺失项应用配置
-func ApplyMissingConfig(iface, ip, mask, dns string, missing []string, cb ProgressCB) {
+// ApplyMissingConfig 按缺失项应用配置，返回失败项的错误信息
+func ApplyMissingConfig(iface, ip, mask, dns string, missing []string, cb ProgressCB) []string {
 	total := len(missing)
 	cur := 0
+	var errs []string
 	step := func(msg string) {
 		cur++
 		if cb != nil {
@@ -229,21 +230,32 @@ func ApplyMissingConfig(iface, ip, mask, dns string, missing []string, cb Progre
 	}
 
 	if system.StringsContains(missing, "IP 地址") {
-		_ = SetStaticIP(iface, ip, mask)
-		_ = SetDNS(iface, dns)
+		if err := SetStaticIP(iface, ip, mask); err != nil {
+			errs = append(errs, "设置IP失败: "+err.Error())
+		}
+		if err := SetDNS(iface, dns); err != nil {
+			errs = append(errs, "设置DNS失败: "+err.Error())
+		}
 		step("正在配置IP地址...")
 	}
 	if system.StringsContains(missing, "路由") {
 		gw := strings.Join(strings.Split(ip, ".")[:3], ".") + ".1"
-		_ = AddRoute(gw)
+		if err := AddRoute(gw); err != nil {
+			errs = append(errs, "添加路由失败: "+err.Error())
+		}
 		step("正在添加路由...")
 	}
 	if system.StringsContains(missing, "MTU") {
-		_ = SetMTU(iface, config.DefaultMTU)
+		if err := SetMTU(iface, config.DefaultMTU); err != nil {
+			errs = append(errs, "设置MTU失败: "+err.Error())
+		}
 		step("正在设置MTU...")
 	}
 	if system.StringsContains(missing, "hosts 文件") {
-		_, _ = hosts.Modify()
+		if _, err := hosts.Modify(); err != nil {
+			errs = append(errs, "修改hosts失败: "+err.Error())
+		}
 		step("正在修改hosts文件...")
 	}
+	return errs
 }
