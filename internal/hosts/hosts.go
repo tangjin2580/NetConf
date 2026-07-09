@@ -74,17 +74,18 @@ func modifyWithFallback(forceTemp bool) ([]string, error) {
 
 	var newContent strings.Builder
 	if existing != "" {
+		// 去除尾部空行，保留原有的 \r\n 行尾
 		newContent.WriteString(strings.TrimRight(existing, "\r\n"))
-		newContent.WriteString("\n")
+		newContent.WriteString("\r\n")
 	}
-	newContent.WriteString("\n# 医保系统\n")
+	newContent.WriteString("\r\n# 医保系统\r\n")
 
 	var added []string
 	for _, entry := range expected {
 		domain := strings.Fields(entry)[1]
 		if !strings.Contains(existing, domain) {
 			newContent.WriteString(entry)
-			newContent.WriteString("\n")
+			newContent.WriteString("\r\n")
 			added = append(added, entry)
 		}
 	}
@@ -98,14 +99,12 @@ func modifyWithFallback(forceTemp bool) ([]string, error) {
 		}
 	}
 
-	// 备选方案：写入临时文件 → cmd move /Y 覆盖
+	// 备选方案：写入临时文件 → 覆盖
 	tmpFile := filepath.Join(system.CacheFolder(), "hosts.tmp")
 	if err := os.WriteFile(tmpFile, []byte(newContent.String()), 0o644); err != nil {
 		return added, fmt.Errorf("无法创建临时 hosts 文件: %w", err)
 	}
-	// 尝试 os.Rename（同分区快速替换）
 	if err := os.Rename(tmpFile, HostsPath); err != nil {
-		// 兜底：cmd move /Y
 		cmd := fmt.Sprintf(`move /Y "%s" "%s"`, tmpFile, HostsPath)
 		if out, err2 := system.RunLine(cmd); err2 != nil {
 			_ = os.Remove(tmpFile)
