@@ -25,6 +25,38 @@ var (
 	ipRe      = regexp.MustCompile(`(?:IPv4 地址|IPv4 Address|IP Address)[^0-9]*(\d+\.\d+\.\d+\.\d+)`)
 )
 
+// getNetshNames 从 netsh interface show interface 获取网卡名（netsh 自身识别的名称）
+func getNetshNames() []string {
+	out, err := runUTF8(`netsh interface show interface`)
+	if err != nil && out == "" {
+		return nil
+	}
+	var names []string
+	inBody := false
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.Contains(line, "---") {
+			inBody = true
+			continue
+		}
+		if !inBody {
+			continue
+		}
+		// netsh 输出每行格式: "AdminState  State  Type  InterfaceName"
+		// 取最后一个字段（接口名称可能含空格，用重叠空格分割）
+		if idx := strings.LastIndex(line, "  "); idx > 0 {
+			name := strings.TrimSpace(line[idx:])
+			if name != "" {
+				names = append(names, name)
+			}
+		}
+	}
+	return names
+}
+
 // runUTF8 以 UTF-8 代码页执行命令并返回输出（适配中文 Windows 的 GBK 输出）
 func runUTF8(line string) (string, error) {
 	return system.RunLine(`chcp 65001 >nul && ` + line)
@@ -121,10 +153,10 @@ func SetDNS(iface, dns string) error {
 		fmt.Sprintf(`name=%q`, iface), "static", dns)
 }
 
-// SetMTU 设置网卡 MTU（Win7 兼容: 移除 store=persistent，MTU 默认持久化）
+// SetMTU 设置网卡 MTU（Win7 兼容: 去掉手动引号，Go exec 自动转义；移除 store=persistent）
 func SetMTU(iface string, mtu int) error {
 	return runNetsh("interface", "ipv4", "set", "subinterface",
-		fmt.Sprintf(`"%s"`, iface), fmt.Sprintf("mtu=%d", mtu))
+		iface, fmt.Sprintf("mtu=%d", mtu))
 }
 
 // AddRoute 添加永久路由
@@ -132,14 +164,24 @@ func AddRoute(gateway string) error {
 	return system.RunNetsh("route", "-p", "add", config.DefaultRoute, "mask", config.DefaultRouteMask, gateway)
 }
 
-// SetAllMTU 设置所有网卡 MTU
+// SetAllMTU 设置所有网卡 MTU（优先使用 netsh 自身识别的网卡名）
 func SetAllMTU(mtu int) []string {
 	var results []string
-	for _, i := range GetInterfaces() {
-		if err := SetMTU(i.Name, mtu); err != nil {
-			results = append(results, fmt.Sprintf("✗ %s 设置失败: %v", i.Name, err))
+	names := getNetshNames()
+	// 备选：netsh 获取失败时回退到 ipconfig 解析
+	if len(names) == 0 {
+		for _, i := range GetInterfaces() {
+			names = append(names, i.Name)
+		}
+	}
+	if len(names) == 0 {
+		return []string{"✗ 无法获取网卡列表，请检查网络适配器"}
+	}
+	for _, name := range names {
+		if err := SetMTU(name, mtu); err != nil {
+			results = append(results, fmt.Sprintf("✗ %s 设置失败: %v", name, err))
 		} else {
-			results = append(results, fmt.Sprintf("✓ %s MTU已设置为 %d", i.Name, mtu))
+			results = append(results, fmt.Sprintf("✓ %s MTU已设置为 %d", name, mtu))
 		}
 	}
 	return results
