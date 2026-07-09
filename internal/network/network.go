@@ -104,27 +104,32 @@ func TestHostConnectivity(host string, port, timeoutSec int) bool {
 	return true
 }
 
+// runNetsh 执行 netsh 命令并返回完整错误信息（包含命令输出）
+func runNetsh(args ...string) error {
+	return system.RunNetsh("netsh", args...)
+}
+
 // SetStaticIP 设置静态 IP 与子网掩码
 func SetStaticIP(iface, ip, mask string) error {
-	return system.Run("netsh", "interface", "ipv4", "set", "address",
+	return runNetsh("interface", "ipv4", "set", "address",
 		fmt.Sprintf(`name=%q`, iface), "static", ip, mask)
 }
 
 // SetDNS 设置 DNS
 func SetDNS(iface, dns string) error {
-	return system.Run("netsh", "interface", "ipv4", "set", "dns",
+	return runNetsh("interface", "ipv4", "set", "dns",
 		fmt.Sprintf(`name=%q`, iface), "static", dns)
 }
 
-// SetMTU 设置网卡 MTU
+// SetMTU 设置网卡 MTU（Win7 兼容: 移除 store=persistent，MTU 默认持久化）
 func SetMTU(iface string, mtu int) error {
-	return system.Run("netsh", "interface", "ipv4", "set", "subinterface",
-		fmt.Sprintf(`"%s"`, iface), fmt.Sprintf("mtu=%d", mtu), "store=persistent")
+	return runNetsh("interface", "ipv4", "set", "subinterface",
+		fmt.Sprintf(`"%s"`, iface), fmt.Sprintf("mtu=%d", mtu))
 }
 
 // AddRoute 添加永久路由
 func AddRoute(gateway string) error {
-	return system.Run("route", "-p", "add", config.DefaultRoute, "mask", config.DefaultRouteMask, gateway)
+	return system.RunNetsh("route", "-p", "add", config.DefaultRoute, "mask", config.DefaultRouteMask, gateway)
 }
 
 // SetAllMTU 设置所有网卡 MTU

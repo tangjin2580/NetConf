@@ -110,6 +110,19 @@ func Run(name string, args ...string) error {
 	return err
 }
 
+// RunNetsh 执行 netsh 命令，失败时将命令输出包含在错误信息中
+func RunNetsh(name string, args ...string) error {
+	out, err := runCmd(name, args...)
+	if err != nil {
+		out = strings.TrimSpace(out)
+		if out != "" {
+			return fmt.Errorf("%w\nnetsh 输出:\n%s", err, out)
+		}
+		return err
+	}
+	return nil
+}
+
 // RunLine 执行一条完整的 cmd 命令行
 func RunLine(line string) (string, error) {
 	return runCmd("cmd", "/c", line)
