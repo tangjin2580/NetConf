@@ -47,11 +47,12 @@ func CheckStatus() Status {
 	return st
 }
 
+const hostsComment = "# 医保系统"
+
 // Modify 补全缺失的医保条目，返回实际新增的条目
 func Modify() ([]string, error) {
 	expected := config.HostsEntries
 
-	// 读取已有内容用于去重
 	var existing string
 	if data, err := os.ReadFile(HostsPath); err == nil {
 		existing = string(data)
@@ -63,8 +64,11 @@ func Modify() ([]string, error) {
 	}
 	defer f.Close()
 
-	if _, err := f.WriteString("\n# 医保系统\n"); err != nil {
-		return nil, err
+	hasComment := strings.Contains(existing, hostsComment)
+	if !hasComment {
+		if _, err := f.WriteString("\n" + hostsComment + "\n"); err != nil {
+			return nil, err
+		}
 	}
 
 	var added []string

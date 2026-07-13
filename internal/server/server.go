@@ -15,6 +15,9 @@ import (
 	"gnetconf/internal/system"
 )
 
+var expectedAuth = "Basic " + base64.StdEncoding.EncodeToString(
+	[]byte(config.ServerUsername+":"+config.ServerPassword))
+
 // InfoServer 内嵌的轻量级配置信息 HTTP 服务器
 type InfoServer struct {
 	Port       int
@@ -29,7 +32,7 @@ func NewInfoServer() *InfoServer {
 	}
 }
 
-// Start 在后台启动 HTTP 服务（端口被占用则静默跳过）
+// Start 在后台启动 HTTP 服务
 func (s *InfoServer) Start() {
 	_ = os.MkdirAll(s.InfoFolder, 0o755)
 	go func() {
@@ -38,7 +41,9 @@ func (s *InfoServer) Start() {
 				system.WriteCrashLog(fmt.Sprintf("server goroutine panic: %v\n\n%s", r, debug.Stack()))
 			}
 		}()
-		_ = http.ListenAndServe(fmt.Sprintf(":%d", s.Port), s.handler())
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", s.Port), s.handler()); err != nil {
+			system.Trace("信息服务器启动失败: " + err.Error())
+		}
 	}()
 }
 
@@ -53,10 +58,8 @@ func (s *InfoServer) handler() http.Handler {
 }
 
 func (s *InfoServer) auth(next http.HandlerFunc) http.HandlerFunc {
-	expected := "Basic " + base64.StdEncoding.EncodeToString(
-		[]byte(config.ServerUsername+":"+config.ServerPassword))
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != expected {
+		if r.Header.Get("Authorization") != expectedAuth {
 			w.Header().Set("WWW-Authenticate", `Basic realm="netconf"`)
 			http.Error(w, "未授权", http.StatusUnauthorized)
 			return

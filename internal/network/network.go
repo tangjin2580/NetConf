@@ -21,17 +21,32 @@ type InterfaceInfo struct {
 }
 
 var (
-	adapterRe = regexp.MustCompile(`(?:以太网适配器|无线局域网适配器|Ethernet adapter|Wireless LAN adapter)\s+(.+?):`)
-	ipRe      = regexp.MustCompile(`(?:IPv4 地址|IPv4 Address|IP Address)[^0-9]*(\d+\.\d+\.\d+\.\d+)`)
+	adapterRe     = regexp.MustCompile(`(?:以太网适配器|无线局域网适配器|Ethernet adapter|Wireless LAN adapter)\s+(.+?):`)
+	ipRe          = regexp.MustCompile(`(?:IPv4 地址|IPv4 Address|IP Address)[^0-9]*(\d+\.\d+\.\d+\.\d+)`)
+	rePingSent    = regexp.MustCompile(`已发送 = (\d+)`)
+	rePingLost    = regexp.MustCompile(`丢失 = (\d+)`)
+	rePingLossPct = regexp.MustCompile(`(\d+)% 丢失`)
+	rePingAvg     = regexp.MustCompile(`平均 = (\d+)ms`)
+	reMtu         = regexp.MustCompile(`MTU\s*:\s*1300`)
 )
+
+var (
+	ifaceCache     []InterfaceInfo
+	ifaceCacheTime time.Time
+)
+
+const ifaceCacheTTL = 3 * time.Second
 
 // runUTF8 以 UTF-8 代码页执行命令并返回输出（适配中文 Windows 的 GBK 输出）
 func runUTF8(line string) (string, error) {
 	return system.RunLine(`chcp 65001 >nul && ` + line)
 }
 
-// GetInterfaces 解析 ipconfig /all 获取网卡与 IPv4
+// GetInterfaces 解析 ipconfig /all 获取网卡与 IPv4，结果缓存 3 秒避免重复执行系统命令
 func GetInterfaces() []InterfaceInfo {
+	if time.Since(ifaceCacheTime) < ifaceCacheTTL && ifaceCache != nil {
+		return ifaceCache
+	}
 	out, err := runUTF8(`ipconfig /all`)
 	if err != nil && out == "" {
 		return nil
@@ -57,7 +72,14 @@ func GetInterfaces() []InterfaceInfo {
 	if curName != "" {
 		result = append(result, InterfaceInfo{Name: curName, IP: curIP})
 	}
+	ifaceCache = result
+	ifaceCacheTime = time.Now()
 	return result
+}
+
+// RefreshInterfaces 清除网卡缓存，下次调用 GetInterfaces 时重新获取
+func RefreshInterfaces() {
+	ifaceCacheTime = time.Time{}
 }
 
 // PingResult 一次 ping 的结果
@@ -77,16 +99,16 @@ func Ping(host string, count, timeoutMs int) PingResult {
 	if err != nil && out == "" {
 		return r
 	}
-	if m := regexp.MustCompile(`已发送 = (\d+)`).FindStringSubmatch(out); m != nil {
+	if m := rePingSent.FindStringSubmatch(out); m != nil {
 		r.Sent, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`丢失 = (\d+)`).FindStringSubmatch(out); m != nil {
+	if m := rePingLost.FindStringSubmatch(out); m != nil {
 		r.Lost, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`(\d+)% 丢失`).FindStringSubmatch(out); m != nil {
+	if m := rePingLossPct.FindStringSubmatch(out); m != nil {
 		r.LossPct, _ = strconv.Atoi(m[1])
 	}
-	if m := regexp.MustCompile(`平均 = (\d+)ms`).FindStringSubmatch(out); m != nil {
+	if m := rePingAvg.FindStringSubmatch(out); m != nil {
 		r.AvgTimeMs, _ = strconv.Atoi(m[1])
 	}
 	r.OK = r.Lost < r.Sent && r.Sent > 0
@@ -106,25 +128,33 @@ func TestHostConnectivity(host string, port, timeoutSec int) bool {
 
 // SetStaticIP 设置静态 IP 与子网掩码
 func SetStaticIP(iface, ip, mask string) error {
-	return system.Run("netsh", "interface", "ipv4", "set", "address",
+	err := system.Run("netsh", "interface", "ipv4", "set", "address",
 		fmt.Sprintf(`name=%q`, iface), "static", ip, mask)
+	RefreshInterfaces()
+	return err
 }
 
 // SetDNS 设置 DNS
 func SetDNS(iface, dns string) error {
-	return system.Run("netsh", "interface", "ipv4", "set", "dns",
+	err := system.Run("netsh", "interface", "ipv4", "set", "dns",
 		fmt.Sprintf(`name=%q`, iface), "static", dns)
+	RefreshInterfaces()
+	return err
 }
 
 // SetMTU 设置网卡 MTU
 func SetMTU(iface string, mtu int) error {
-	return system.Run("netsh", "interface", "ipv4", "set", "subinterface",
+	err := system.Run("netsh", "interface", "ipv4", "set", "subinterface",
 		fmt.Sprintf(`"%s"`, iface), fmt.Sprintf("mtu=%d", mtu), "store=persistent")
+	RefreshInterfaces()
+	return err
 }
 
 // AddRoute 添加永久路由
 func AddRoute(gateway string) error {
-	return system.Run("route", "-p", "add", config.DefaultRoute, "mask", config.DefaultRouteMask, gateway)
+	err := system.Run("route", "-p", "add", config.DefaultRoute, "mask", config.DefaultRouteMask, gateway)
+	RefreshInterfaces()
+	return err
 }
 
 // SetAllMTU 设置所有网卡 MTU
@@ -179,7 +209,7 @@ func MtuAlreadySet(iface string) bool {
 	if err != nil && out == "" {
 		return false
 	}
-	return regexp.MustCompile(`MTU\s*:\s*1300`).MatchString(out)
+	return reMtu.MatchString(out)
 }
 
 // RouteAlreadySet 判断 10.0.0.0 路由是否已存在
@@ -224,21 +254,33 @@ func ApplyMissingConfig(iface, ip, mask, dns string, missing []string, cb Progre
 	}
 
 	if system.StringsContains(missing, "IP 地址") {
-		_ = SetStaticIP(iface, ip, mask)
-		_ = SetDNS(iface, dns)
+		if err := SetStaticIP(iface, ip, mask); err != nil {
+			system.Trace("SetStaticIP 失败: " + err.Error())
+		}
+		if err := SetDNS(iface, dns); err != nil {
+			system.Trace("SetDNS 失败: " + err.Error())
+		}
 		step("正在配置IP地址...")
 	}
 	if system.StringsContains(missing, "路由") {
 		gw := strings.Join(strings.Split(ip, ".")[:3], ".") + ".1"
-		_ = AddRoute(gw)
+		if err := AddRoute(gw); err != nil {
+			system.Trace("AddRoute 失败: " + err.Error())
+		}
 		step("正在添加路由...")
 	}
 	if system.StringsContains(missing, "MTU") {
-		_ = SetMTU(iface, config.DefaultMTU)
+		if err := SetMTU(iface, config.DefaultMTU); err != nil {
+			system.Trace("SetMTU 失败: " + err.Error())
+		}
 		step("正在设置MTU...")
 	}
 	if system.StringsContains(missing, "hosts 文件") {
-		_, _ = hosts.Modify()
+		if added, err := hosts.Modify(); err != nil {
+			system.Trace("hosts.Modify 失败: " + err.Error())
+		} else {
+			_ = added
+		}
 		step("正在修改hosts文件...")
 	}
 }

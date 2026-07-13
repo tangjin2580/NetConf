@@ -104,10 +104,13 @@ func runCmd(name string, args ...string) (string, error) {
 	return string(out), err
 }
 
-// Run 执行设置类命令（netsh / route 等），失败返回错误
+// Run 执行设置类命令（netsh / route 等），失败返回错误（含命令输出便于排查）
 func Run(name string, args ...string) error {
-	_, err := runCmd(name, args...)
-	return err
+	out, err := runCmd(name, args...)
+	if err != nil {
+		return fmt.Errorf("%s: %w\n输出: %s", strings.Join(append([]string{name}, args...), " "), err, out)
+	}
+	return nil
 }
 
 // RunLine 执行一条完整的 cmd 命令行
